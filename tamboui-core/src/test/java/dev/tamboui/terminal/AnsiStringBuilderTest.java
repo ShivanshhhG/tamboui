@@ -102,11 +102,29 @@ class AnsiStringBuilderTest {
     }
 
     @Test
-    @DisplayName("hyperlinkStart escapes id and url")
-    void hyperlinkStartEscapesParams() {
+    @DisplayName("hyperlinkStart passes semicolons and backslashes through unchanged")
+    void hyperlinkStartPassesThroughSeparators() {
         Hyperlink hyperlink = Hyperlink.of("https://example.com/a;b\\c", "id;1\\2");
         String result = AnsiStringBuilder.hyperlinkStart(hyperlink);
-        assertThat(result).isEqualTo("\u001b]8;id=id\\;1\\\\2;https://example.com/a\\;b\\\\c\u001b\\");
+        assertThat(result).isEqualTo("\u001b]8;id=id;1\\2;https://example.com/a;b\\c\u001b\\");
+    }
+
+    @Test
+    @DisplayName("hyperlinkStart percent-encodes control characters in url (GHSA-5m5f-4gqv-8c29)")
+    void hyperlinkStartSanitizesControlCharsInUrl() {
+        Hyperlink hyperlink = Hyperlink.of("https://example.com/\u0007\u001b[2J");
+        String result = AnsiStringBuilder.hyperlinkStart(hyperlink);
+        assertThat(result).isEqualTo("\u001b]8;;https://example.com/%07%1B[2J\u001b\\");
+        assertThat(result).doesNotContain("\u0007");
+        assertThat(result).doesNotContain("\u001b[2J");
+    }
+
+    @Test
+    @DisplayName("hyperlinkStart percent-encodes control characters in id")
+    void hyperlinkStartSanitizesControlCharsInId() {
+        Hyperlink hyperlink = Hyperlink.of("https://example.com", "a\u001bb\u007fc");
+        String result = AnsiStringBuilder.hyperlinkStart(hyperlink);
+        assertThat(result).isEqualTo("\u001b]8;id=a%1Bb%7Fc;https://example.com\u001b\\");
     }
 
     @Test

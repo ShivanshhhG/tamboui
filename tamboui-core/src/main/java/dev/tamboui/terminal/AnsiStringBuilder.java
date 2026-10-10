@@ -158,15 +158,28 @@ public final class AnsiStringBuilder {
     }
 
     /**
-     * Escapes special characters in OSC parameter values.
+     * Sanitizes an OSC 8 parameter value against terminal escape-sequence injection.
      * <p>
-     * According to the OSC8 specification, semicolons and backslashes need to be escaped.
+     * Control characters that could terminate or forge terminal sequences are
+     * percent-encoded: C0 controls ({@code 0x00}-{@code 0x1F}, including ESC and
+     * BEL), DEL ({@code 0x7F}) and C1 controls ({@code 0x80}-{@code 0x9F}). All
+     * other characters, including semicolons, are passed through unchanged: the
+     * OSC 8 specification defines no backslash escaping, and escaping semicolons
+     * corrupts otherwise valid URLs.
      *
-     * @param param the parameter value to escape
-     * @return the escaped parameter value
+     * @param param the parameter value to sanitize
+     * @return the sanitized parameter value, safe to embed in an OSC 8 sequence
      */
     private static String escapeOscParam(String param) {
-        // Escape backslashes and semicolons
-        return param.replace("\\", "\\\\").replace(";", "\\;");
+        StringBuilder sb = new StringBuilder(param.length());
+        for (int i = 0; i < param.length(); i++) {
+            char c = param.charAt(i);
+            if (c <= 0x1F || c == 0x7F || (c >= 0x80 && c <= 0x9F)) {
+                sb.append('%').append(String.format("%02X", (int) c));
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }
