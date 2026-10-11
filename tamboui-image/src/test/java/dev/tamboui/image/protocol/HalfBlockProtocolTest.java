@@ -9,10 +9,13 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import dev.tamboui.assertj.BufferAssertions;
 import dev.tamboui.buffer.Buffer;
+import dev.tamboui.buffer.Cell;
 import dev.tamboui.image.ImageData;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
+import dev.tamboui.style.Style;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -146,6 +149,38 @@ class HalfBlockProtocolTest {
 
         // Cell should remain unchanged (empty)
         assertThat(buffer.get(0, 0).symbol()).isEqualTo(" ");
+    }
+
+    @Test
+    void render_smaller_image_keeps_its_size_centered_and_other_cells_untouched() throws IOException {
+        HalfBlockProtocol protocol = new HalfBlockProtocol();
+        ImageData image = createSolidImage(2, 2, 0xFFFF0000);
+        Rect area = new Rect(0, 0, 6, 3);
+        Buffer buffer = Buffer.filled(area, new Cell(".", Style.EMPTY));
+
+        protocol.render(image, area, buffer, null);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "......",
+            "..▀▀..",
+            "......");
+        BufferAssertions.assertThat(buffer).at(2, 1)
+            .hasForeground(Color.rgb(255, 0, 0))
+            .hasBackground(Color.rgb(255, 0, 0));
+    }
+
+    @Test
+    void render_larger_image_is_shrunk_to_area() throws IOException {
+        HalfBlockProtocol protocol = new HalfBlockProtocol();
+        ImageData image = createSolidImage(20, 20, 0xFFFF0000);
+        Rect area = new Rect(0, 0, 5, 2);
+        Buffer buffer = Buffer.empty(area);
+
+        protocol.render(image, area, buffer, null);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "▀▀▀▀▀",
+            "▀▀▀▀▀");
     }
 
     private ImageData createSolidImage(int width, int height, int argb) {

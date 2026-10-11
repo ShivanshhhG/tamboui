@@ -9,9 +9,12 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import dev.tamboui.assertj.BufferAssertions;
 import dev.tamboui.buffer.Buffer;
+import dev.tamboui.buffer.Cell;
 import dev.tamboui.image.ImageData;
 import dev.tamboui.layout.Rect;
+import dev.tamboui.style.Style;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -195,6 +198,35 @@ class BrailleProtocolTest {
                 assertThat(symbol.codePointAt(0)).isBetween(BRAILLE_BASE, BRAILLE_BASE + 0xFF);
             }
         }
+    }
+
+    @Test
+    void render_smaller_image_keeps_its_size_centered_and_other_cells_untouched() throws IOException {
+        BrailleProtocol protocol = new BrailleProtocol();
+        ImageData image = createSolidImage(2, 4, 0xFFFFFFFF);
+        Rect area = new Rect(0, 0, 6, 3);
+        Buffer buffer = Buffer.filled(area, new Cell(".", Style.EMPTY));
+
+        protocol.render(image, area, buffer, null);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "......",
+            "..⣿...",
+            "......");
+    }
+
+    @Test
+    void render_larger_image_is_shrunk_to_area() throws IOException {
+        BrailleProtocol protocol = new BrailleProtocol();
+        ImageData image = createSolidImage(20, 20, 0xFFFFFFFF);
+        Rect area = new Rect(0, 0, 2, 2);
+        Buffer buffer = Buffer.empty(area);
+
+        protocol.render(image, area, buffer, null);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "⣿⣿",
+            "⣿⣿");
     }
 
     private ImageData createSolidImage(int width, int height, int argb) {

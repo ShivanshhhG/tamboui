@@ -21,6 +21,12 @@ import dev.tamboui.style.Style;
  * <p>
  * The top half uses the foreground color and the bottom half uses the background color,
  * allowing two independent colors per cell.
+ * <p>
+ * The image is drawn at its own size, one pixel per half cell, centered in the area, and the
+ * cells around it are left untouched. Scaling the image to the area is up to the caller, as
+ * the {@link dev.tamboui.image.Image} widget does according to its
+ * {@link dev.tamboui.image.ImageScaling}. An image wider or taller than the area is shrunk
+ * to the width or height of the area.
  */
 public final class HalfBlockProtocol implements ImageProtocol {
 
@@ -47,18 +53,14 @@ public final class HalfBlockProtocol implements ImageProtocol {
             return;
         }
 
-        // Calculate grid dimensions (1x2 resolution)
-        int gridWidth = area.width();
-        int gridHeight = area.height() * 2;
-
-        // Scale image to fit the grid
-        ImageData scaled = image.resize(gridWidth, gridHeight);
+        CellPlacement placement = CellPlacement.centered(image, area, RESOLUTION);
+        Rect cells = placement.cells();
 
         // Render each cell
-        for (int cellY = 0; cellY < area.height(); cellY++) {
-            for (int cellX = 0; cellX < area.width(); cellX++) {
-                int topPixel = scaled.pixelAt(cellX, cellY * 2);
-                int bottomPixel = scaled.pixelAt(cellX, cellY * 2 + 1);
+        for (int cellY = 0; cellY < cells.height(); cellY++) {
+            for (int cellX = 0; cellX < cells.width(); cellX++) {
+                int topPixel = placement.pixelAt(cellX, cellY * 2);
+                int bottomPixel = placement.pixelAt(cellX, cellY * 2 + 1);
 
                 boolean topVisible = ImageData.isVisible(topPixel);
                 boolean bottomVisible = ImageData.isVisible(bottomPixel);
@@ -88,7 +90,7 @@ public final class HalfBlockProtocol implements ImageProtocol {
                     style = Style.EMPTY.fg(bottomColor);
                 }
 
-                buffer.setString(area.x() + cellX, area.y() + cellY, symbol, style);
+                buffer.setString(cells.x() + cellX, cells.y() + cellY, symbol, style);
             }
         }
     }

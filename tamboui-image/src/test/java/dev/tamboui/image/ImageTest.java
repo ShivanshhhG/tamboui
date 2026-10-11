@@ -8,6 +8,7 @@ import java.awt.image.BufferedImage;
 
 import org.junit.jupiter.api.Test;
 
+import dev.tamboui.assertj.BufferAssertions;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.image.protocol.BrailleProtocol;
 import dev.tamboui.image.protocol.HalfBlockProtocol;
@@ -188,63 +189,160 @@ class ImageTest {
 
     @Test
     void render_fit_scaling_maintains_aspect_ratio() {
-        // Create wide image (20x10) to render in square area (10x10)
+        // 100x10 pixels fit into the 10x12 half-block pixels of a 10x6 area as 10x1 pixels
         Image image = Image.builder()
-            .data(createTestImage(20, 10, 0xFFFF0000))
+            .data(createTestImage(100, 10, 0xFFFF0000))
             .scaling(ImageScaling.FIT)
             .protocol(new HalfBlockProtocol())
             .build();
 
-        Rect area = new Rect(0, 0, 10, 10);
+        Rect area = new Rect(0, 0, 10, 6);
         Buffer buffer = Buffer.empty(area);
 
         image.render(area, buffer);
-        // Should render without error
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "          ",
+            "          ",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "          ",
+            "          ",
+            "          ");
+    }
+
+    @Test
+    void render_fit_scaling_with_braille_maintains_aspect_ratio() {
+        // 100x10 pixels fit into the 20x24 Braille dots of a 10x6 area as 20x2 dots
+        Image image = Image.builder()
+            .data(createTestImage(100, 10, 0xFFFFFFFF))
+            .scaling(ImageScaling.FIT)
+            .protocol(new BrailleProtocol())
+            .build();
+
+        Rect area = new Rect(0, 0, 10, 6);
+        Buffer buffer = Buffer.empty(area);
+
+        image.render(area, buffer);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "          ",
+            "          ",
+            "⠛⠛⠛⠛⠛⠛⠛⠛⠛⠛",
+            "          ",
+            "          ",
+            "          ");
     }
 
     @Test
     void render_stretch_scaling_fills_area() {
         Image image = Image.builder()
-            .data(createTestImage(5, 5, 0xFFFF0000))
+            .data(createTestImage(100, 10, 0xFFFF0000))
             .scaling(ImageScaling.STRETCH)
             .protocol(new HalfBlockProtocol())
             .build();
 
-        Rect area = new Rect(0, 0, 10, 10);
+        Rect area = new Rect(0, 0, 10, 6);
         Buffer buffer = Buffer.empty(area);
 
         image.render(area, buffer);
-        // Should render without error
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀");
+    }
+
+    @Test
+    void render_stretch_scaling_with_braille_fills_area() {
+        Image image = Image.builder()
+            .data(createTestImage(100, 10, 0xFFFFFFFF))
+            .scaling(ImageScaling.STRETCH)
+            .protocol(new BrailleProtocol())
+            .build();
+
+        Rect area = new Rect(0, 0, 10, 6);
+        Buffer buffer = Buffer.empty(area);
+
+        image.render(area, buffer);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+            "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿");
     }
 
     @Test
     void render_none_scaling_preserves_original_size() {
+        // 4x4 pixels are 4x2 cells of half-blocks
         Image image = Image.builder()
-            .data(createTestImage(5, 5, 0xFFFF0000))
+            .data(createTestImage(4, 4, 0xFFFF0000))
             .scaling(ImageScaling.NONE)
             .protocol(new HalfBlockProtocol())
             .build();
 
-        Rect area = new Rect(0, 0, 10, 10);
+        Rect area = new Rect(0, 0, 10, 6);
         Buffer buffer = Buffer.empty(area);
 
         image.render(area, buffer);
-        // Should render without error
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "          ",
+            "          ",
+            "   ▀▀▀▀   ",
+            "   ▀▀▀▀   ",
+            "          ",
+            "          ");
+    }
+
+    @Test
+    void render_none_scaling_with_braille_preserves_original_size() {
+        // 4x8 pixels are 2x2 cells of Braille dots
+        Image image = Image.builder()
+            .data(createTestImage(4, 8, 0xFFFFFFFF))
+            .scaling(ImageScaling.NONE)
+            .protocol(new BrailleProtocol())
+            .build();
+
+        Rect area = new Rect(0, 0, 10, 6);
+        Buffer buffer = Buffer.empty(area);
+
+        image.render(area, buffer);
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "          ",
+            "          ",
+            "    ⣿⣿    ",
+            "    ⣿⣿    ",
+            "          ",
+            "          ");
     }
 
     @Test
     void render_fill_scaling_covers_area() {
         Image image = Image.builder()
-            .data(createTestImage(20, 10, 0xFFFF0000))
+            .data(createTestImage(100, 10, 0xFFFF0000))
             .scaling(ImageScaling.FILL)
             .protocol(new HalfBlockProtocol())
             .build();
 
-        Rect area = new Rect(0, 0, 10, 10);
+        Rect area = new Rect(0, 0, 10, 6);
         Buffer buffer = Buffer.empty(area);
 
         image.render(area, buffer);
-        // Should render without error
+
+        BufferAssertions.assertThat(buffer).hasContent(
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀",
+            "▀▀▀▀▀▀▀▀▀▀");
     }
 
     private ImageData createTestImage(int width, int height, int argb) {

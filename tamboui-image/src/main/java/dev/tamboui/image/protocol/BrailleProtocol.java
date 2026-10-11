@@ -19,6 +19,12 @@ import dev.tamboui.style.Style;
  * Each terminal cell can display a 2x4 grid of Braille dots (8 dots total),
  * providing the highest character-based resolution at 2x4 virtual pixels per cell.
  * <p>
+ * The image is drawn at its own size, one pixel per dot, centered in the area, and the
+ * cells around it are left untouched. Scaling the image to the area is up to the caller, as
+ * the {@link dev.tamboui.image.Image} widget does according to its
+ * {@link dev.tamboui.image.ImageScaling}. An image wider or taller than the area is shrunk
+ * to the width or height of the area.
+ * <p>
  * Braille patterns use Unicode characters from U+2800 to U+28FF.
  * The 8 dots are mapped to bits as follows:
  * <pre>
@@ -76,19 +82,15 @@ public final class BrailleProtocol implements ImageProtocol {
             return;
         }
 
-        // Calculate grid dimensions (2x4 resolution)
-        int gridWidth = area.width() * 2;
-        int gridHeight = area.height() * 4;
-
-        // Scale image to fit the grid
-        ImageData scaled = image.resize(gridWidth, gridHeight);
+        CellPlacement placement = CellPlacement.centered(image, area, RESOLUTION);
+        Rect cells = placement.cells();
 
         // Calculate adaptive threshold based on percentile
-        int threshold = calculatePercentileThreshold(scaled);
+        int threshold = calculatePercentileThreshold(placement.image());
 
         // Render each cell
-        for (int cellY = 0; cellY < area.height(); cellY++) {
-            for (int cellX = 0; cellX < area.width(); cellX++) {
+        for (int cellY = 0; cellY < cells.height(); cellY++) {
+            for (int cellX = 0; cellX < cells.width(); cellX++) {
                 int pattern = 0;
                 int colorCount = 0;
                 long rSum = 0, gSum = 0, bSum = 0;
@@ -98,7 +100,7 @@ public final class BrailleProtocol implements ImageProtocol {
                     for (int dx = 0; dx < 2; dx++) {
                         int gridX = cellX * 2 + dx;
                         int gridY = cellY * 4 + dy;
-                        int pixel = scaled.pixelAt(gridX, gridY);
+                        int pixel = placement.pixelAt(gridX, gridY);
 
                         if (isPixelOn(pixel, threshold)) {
                             pattern |= BRAILLE_DOTS[dx][dy];
@@ -123,7 +125,7 @@ public final class BrailleProtocol implements ImageProtocol {
 
                     String brailleChar = String.valueOf((char) (BRAILLE_BASE + pattern));
                     Style style = cellColor != null ? Style.EMPTY.fg(cellColor) : Style.EMPTY;
-                    buffer.setString(area.x() + cellX, area.y() + cellY, brailleChar, style);
+                    buffer.setString(cells.x() + cellX, cells.y() + cellY, brailleChar, style);
                 }
             }
         }

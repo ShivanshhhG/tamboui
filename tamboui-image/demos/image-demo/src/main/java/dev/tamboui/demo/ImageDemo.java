@@ -11,10 +11,13 @@
  */
 package dev.tamboui.demo;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 
 import dev.tamboui.image.Image;
 import dev.tamboui.image.ImageData;
@@ -70,8 +73,8 @@ public class ImageDemo {
 
     private boolean running = true;
     private final TerminalImageCapabilities capabilities;
-    private final ImageData imageData;
-    private final String imageTitle;
+    private final List<DemoImage> images = new ArrayList<>();
+    private int currentImageIndex;
     private ImageProtocol currentProtocol;
     private ImageScaling currentScaling = ImageScaling.FIT;
     private boolean forceProtocol;
@@ -99,13 +102,52 @@ public class ImageDemo {
         }
         this.currentProtocol = capabilities.bestProtocol();
 
-        // Load image from path or bundled resource
+        // A custom image first, if given, then the bundled photo and synthetic test
+        // images whose aspect ratios make the scaling modes easy to tell apart.
         if (customImagePath != null && Files.exists(Path.of(customImagePath))) {
-            this.imageData = ImageData.fromPath(Path.of(customImagePath));
-            this.imageTitle = Path.of(customImagePath).getFileName().toString();
-        } else {
-            this.imageData = ImageData.fromResource(BUNDLED_IMAGE);
-            this.imageTitle = BUNDLED_IMAGE_TITLE;
+            Path path = Path.of(customImagePath);
+            images.add(new DemoImage(path.getFileName().toString(), ImageData.fromPath(path)));
+        }
+        images.add(new DemoImage(BUNDLED_IMAGE_TITLE + " (photo 3:2)", ImageData.fromResource(BUNDLED_IMAGE)));
+        images.add(new DemoImage("Checkerboard (square 1:1)", checkerboard(240, 240, 8)));
+        images.add(new DemoImage("Banner (wide 4:1)", checkerboard(320, 80, 8)));
+        images.add(new DemoImage("Column (tall 1:4)", checkerboard(80, 320, 8)));
+        images.add(new DemoImage("Tiny (16x16, for NONE)", checkerboard(16, 16, 2)));
+    }
+
+    /**
+     * Generates a checkerboard with a bright border. Its squares turn into rectangles
+     * when an image is stretched, so the scaling modes are easy to tell apart.
+     *
+     * @param width   the width in pixels
+     * @param height  the height in pixels
+     * @param squares the number of squares across the shorter side
+     * @return the generated image
+     */
+    private static ImageData checkerboard(int width, int height, int squares) {
+        int cell = Math.max(1, Math.min(width, height) / squares);
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                boolean edge = x < 2 || y < 2 || x >= width - 2 || y >= height - 2;
+                boolean dark = ((x / cell) + (y / cell)) % 2 == 0;
+                int argb = edge ? 0xFFFFEE00 : (dark ? 0xFF1E3A8A : 0xFF60A5FA);
+                image.setRGB(x, y, argb);
+            }
+        }
+        return ImageData.fromBufferedImage(image);
+    }
+
+    /**
+     * A named image shown in the demo.
+     */
+    private static final class DemoImage {
+        private final String title;
+        private final ImageData data;
+
+        DemoImage(String title, ImageData data) {
+            this.title = title;
+            this.data = data;
         }
     }
 
@@ -179,6 +221,12 @@ public class ImageDemo {
             case 'A':
                 // Auto-detect best protocol
                 currentProtocol = capabilities.bestProtocol();
+                break;
+            case '[':
+                currentImageIndex = (currentImageIndex - 1 + images.size()) % images.size();
+                break;
+            case ']':
+                currentImageIndex = (currentImageIndex + 1) % images.size();
                 break;
             case 6: // Ctrl+F - force protocol
                 forceProtocol = true;
@@ -296,15 +344,16 @@ public class ImageDemo {
             return;
         }
 
+        DemoImage current = images.get(currentImageIndex);
         var image = Image.builder()
-            .data(imageData)
+            .data(current.data)
             .scaling(currentScaling)
             .protocol(currentProtocol)
             .block(Block.builder()
                 .borders(Borders.ALL)
                 .borderType(BorderType.ROUNDED)
                 .borderStyle(Style.EMPTY.fg(Color.BLUE))
-                .title(Title.from(Line.from(Span.raw(" " + imageTitle + " ").blue())))
+                .title(Title.from(Line.from(Span.raw(" " + current.title + " ").blue())))
                 .build())
             .build();
 
@@ -330,7 +379,7 @@ public class ImageDemo {
                 .borders(Borders.ALL)
                 .borderType(BorderType.ROUNDED)
                 .borderStyle(Style.EMPTY.fg(Color.YELLOW))
-                .title(Title.from(Line.from(Span.raw(" " + imageTitle + " ").blue())))
+                .title(Title.from(Line.from(Span.raw(" " + images.get(currentImageIndex).title + " ").blue())))
                 .build())
             .build();
 
@@ -363,7 +412,9 @@ public class ImageDemo {
             Span.raw("s").bold().yellow(),
             Span.raw(" Stretch  ").dim(),
             Span.raw("n").bold().yellow(),
-            Span.raw(" None  ").dim(),
+            Span.raw(" None   ").dim(),
+            Span.raw("[ ]").bold().yellow(),
+            Span.raw(" Image  ").dim(),
             Span.raw("q").bold().red(),
             Span.raw(" Quit").dim()
         );
