@@ -282,6 +282,9 @@ Path: C:\\Users\\name      renders as:  Path: C:\Users\name</code></pre>
 <div class="paragraph">
 <p>Supported backslash escapes: <code>\[</code>, <code>\]</code>, <code>\\</code>. Other sequences (like <code>\n</code>) are preserved as-is.</p>
 </div>
+<div class="paragraph">
+<p>A <code>[</code> that is not closed by a <code>]</code> on the same line needs no escape: it is plain text, so <code>price[USD 10</code> renders as <code>price[USD 10</code>.</p>
+</div>
 </div>
 </div>
 <div class="sect2">
