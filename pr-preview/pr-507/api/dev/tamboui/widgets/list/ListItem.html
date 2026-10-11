@@ -280,10 +280,12 @@ loadScripts(document, 'script');</script>
 <h3>height</h3>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">int</span>&nbsp;<span class="element-name">height</span>()</div>
-<div class="block">Returns the height of this item in lines.</div>
+<div class="block">Returns the height of this item in lines.
+<p>
+An item without lines, such as <code>ListItem.from("")</code>, is one blank line high.</div>
 <dl class="notes">
 <dt>Returns:</dt>
-<dd>the height in lines</dd>
+<dd>the height in lines, at least 1</dd>
 </dl>
 </div>
 </section>
