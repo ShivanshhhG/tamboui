@@ -255,7 +255,8 @@ include::{snippets-dir}/dev/tamboui/docs/snippets/ApiLevelsSnippets.java[tags=ex
 When closing runners:
 
 * **Internally-created scheduler**: Shut down automatically when the runner closes
-* **Externally-provided scheduler**: NOT shut down - the caller retains ownership and is responsible for its lifecycle
+* **Externally-provided scheduler**: NOT shut down - the caller retains ownership and is responsible for its lifecycle.
+The runner cancels its own tick and resize task; actions you scheduled on it keep running until you cancel them.
 
 This allows frameworks to manage scheduler lifecycles independently of individual runner instances.
 

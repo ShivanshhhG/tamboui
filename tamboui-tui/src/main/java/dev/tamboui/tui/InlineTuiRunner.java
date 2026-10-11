@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -77,6 +78,7 @@ public final class InlineTuiRunner implements AutoCloseable {
     private final AtomicBoolean windowTitleSet = new AtomicBoolean(false);
     private final ScheduledExecutorService scheduler;
     private final boolean schedulerOwned;
+    private final ScheduledFuture<?> schedulerTask;
     private final AtomicLong frameCount;
     private final Thread shutdownHook;
     private final AtomicReference<Instant> lastTick;
@@ -117,7 +119,10 @@ public final class InlineTuiRunner implements AutoCloseable {
         // Only schedule the internal callback if ticks are enabled
         if (config.ticksEnabled() && config.tickRate() != null) {
             long periodMs = config.tickRate().toMillis();
-            this.scheduler.scheduleAtFixedRate(this::schedulerCallback, periodMs, periodMs, TimeUnit.MILLISECONDS);
+            this.schedulerTask = this.scheduler.scheduleAtFixedRate(
+                this::schedulerCallback, periodMs, periodMs, TimeUnit.MILLISECONDS);
+        } else {
+            this.schedulerTask = null;
         }
 
         // Create and start the input reader thread
@@ -442,6 +447,8 @@ public final class InlineTuiRunner implements AutoCloseable {
      * <p>
      * If a scheduler was provided via configuration, it is NOT shut down -
      * the caller retains ownership and is responsible for its lifecycle.
+     * The runner's own periodic task (ticks) is cancelled, so it does not
+     * keep running on that scheduler.
      * If no scheduler was provided, the internally-created scheduler is shut down.
      */
     @Override
@@ -458,6 +465,12 @@ public final class InlineTuiRunner implements AutoCloseable {
             Runtime.getRuntime().removeShutdownHook(shutdownHook);
         } catch (IllegalStateException e) {
             // JVM is already shutting down
+        }
+
+        // A scheduler passed in the config is not shut down below, and would otherwise keep
+        // running the callback, and holding on to this runner, after close
+        if (schedulerTask != null) {
+            schedulerTask.cancel(false);
         }
 
         // Shutdown scheduler only if we own it
