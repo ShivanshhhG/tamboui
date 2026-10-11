@@ -41,6 +41,8 @@ public final class AnsiTerminalCapture extends OutputStream {
 
     // Frame capture timing
     private long lastCaptureTime;
+    // Set once the recording duration has passed: no frame is captured after it, so what is written is only teed
+    private boolean ended;
 
     private AnsiTerminalCapture(PrintStream tee, RecordingConfig config) {
         this.tee = tee;
@@ -105,6 +107,15 @@ public final class AnsiTerminalCapture extends OutputStream {
     }
 
     /**
+     * Returns how many written bytes are kept for the next frame, or 0 if not installed.
+     *
+     * @return the number of bytes written since the last captured frame
+     */
+    static synchronized int pendingBytes() {
+        return instance != null ? instance.currentFrame.size() : 0;
+    }
+
+    /**
      * Returns the configured width, or 80 if not installed.
      *
      * @return the terminal width in columns
@@ -132,7 +143,9 @@ public final class AnsiTerminalCapture extends OutputStream {
         }
 
         // Accumulate byte for the current frame
-        currentFrame.write(b);
+        if (!ended) {
+            currentFrame.write(b);
+        }
     }
 
     @Override
@@ -143,7 +156,9 @@ public final class AnsiTerminalCapture extends OutputStream {
         tee.flush();
 
         // Accumulate bytes for the current frame
-        currentFrame.write(b, off, len);
+        if (!ended) {
+            currentFrame.write(b, off, len);
+        }
     }
 
     @Override
@@ -161,8 +176,10 @@ public final class AnsiTerminalCapture extends OutputStream {
         long now = System.currentTimeMillis();
         long elapsed = now - startTime;
 
-        // Check duration limit
+        // Check duration limit: past it nothing more is recorded, so drop what was kept for the next frame
         if (elapsed > maxDurationMs) {
+            ended = true;
+            currentFrame.reset();
             return;
         }
 

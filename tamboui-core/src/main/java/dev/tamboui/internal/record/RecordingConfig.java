@@ -63,10 +63,10 @@ public final class RecordingConfig {
 
         RecordingConfig config = new RecordingConfig(
                 outputPath,
-                Integer.getInteger(PREFIX + ".fps", 10),
-                Integer.getInteger(PREFIX + ".duration", 10000),
-                Integer.getInteger(PREFIX + ".width", 80),
-                Integer.getInteger(PREFIX + ".height", 24),
+                positiveInteger("fps", 10),
+                positiveInteger("duration", 10000),
+                positiveInteger("width", 80),
+                positiveInteger("height", 24),
                 configPath != null ? Paths.get(configPath) : null
         );
 
@@ -115,6 +115,36 @@ public final class RecordingConfig {
         String castName = (dot > 0 ? name.substring(0, dot) : name) + ".cast";
         Path parent = configFile.getParent();
         return parent != null ? parent.resolve(castName) : Paths.get(castName);
+    }
+
+    /**
+     * Reads the {@code tamboui.record.<name>} property, which must be a positive integer. Any other value would break
+     * the recording: a frame rate of 0 divides by zero on every frame and on every {@code System.out} flush, a negative
+     * size fails to create the screen, and a size or duration of 0 records nothing. Such a value, or one that is not a
+     * number, is reported on standard error and the default is used.
+     *
+     * @param name         the property name after {@code tamboui.record.}
+     * @param defaultValue the value to use when the property is not set or not a positive integer
+     * @return the value of the property, or the default
+     */
+    private static int positiveInteger(String name, int defaultValue) {
+        String property = PREFIX + "." + name;
+        String value = System.getProperty(property);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            // Read as Integer.getInteger() read it before, so a value such as 0x10 still works
+            int number = Integer.decode(value);
+            if (number > 0) {
+                return number;
+            }
+        } catch (NumberFormatException e) {
+            // reported below, as a number that is not positive
+        }
+        System.err.println("Warning: Ignoring " + property + "=" + value + ", which is not a positive integer; using "
+                + defaultValue);
+        return defaultValue;
     }
 
     /**

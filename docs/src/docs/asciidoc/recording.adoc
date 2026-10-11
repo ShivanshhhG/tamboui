@@ -60,6 +60,9 @@ enables recording, with the output derived from the tape name
 |Terminal size the recording reports and captures
 |===
 
+The numbers must be positive integers. Any other value is reported on standard error and the default is
+used instead.
+
 == Driving an application with a tape
 
 Supply a tape file with `tamboui.record.config` and the application is driven by the
