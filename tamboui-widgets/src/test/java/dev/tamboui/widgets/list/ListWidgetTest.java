@@ -5,6 +5,7 @@
 package dev.tamboui.widgets.list;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -201,6 +202,62 @@ class ListWidgetTest {
         expected.setString(0, 0, "Custom widget", Style.EMPTY);
 
         assertThat(buffer).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("A selected blank item keeps its row and gets the highlight")
+    void selectedBlankItemKeepsItsRow() {
+        ListWidget list = ListWidget.builder()
+            .items("a", "", "b")
+            .highlightSymbol("> ")
+            .build();
+        Rect area = new Rect(0, 0, 10, 3);
+        Buffer buffer = Buffer.empty(area);
+        ListState state = new ListState();
+        state.select(1);
+
+        list.render(area, buffer, state);
+
+        Style reversed = Style.EMPTY.reversed();
+        Buffer expected = Buffer.empty(area);
+        expected.setString(2, 0, "a", Style.EMPTY);
+        expected.setString(0, 1, "> ", reversed);
+        expected.setStyle(new Rect(0, 1, 10, 1), reversed);
+        expected.setString(2, 2, "b", Style.EMPTY);
+
+        assertThat(buffer).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("Blank spacer items keep their rows")
+    void blankSpacerItemsKeepTheirRows() {
+        ListWidget list = ListWidget.builder()
+            .items("Fruit", "", "Apple", "", "Banana")
+            .highlightSymbol("")
+            .build();
+        Rect area = new Rect(0, 0, 10, 5);
+        Buffer buffer = Buffer.empty(area);
+
+        list.render(area, buffer, new ListState());
+
+        Buffer expected = Buffer.empty(area);
+        expected.setString(0, 0, "Fruit", Style.EMPTY);
+        expected.setString(0, 2, "Apple", Style.EMPTY);
+        expected.setString(0, 4, "Banana", Style.EMPTY);
+
+        assertThat(buffer).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("ListState counts a blank item as a row when scrolling to the selection")
+    void scrollToSelectedCountsBlankItem() {
+        List<ListItem> items = Arrays.asList(ListItem.from("a"), ListItem.from(""), ListItem.from("b"));
+        ListState state = new ListState();
+        state.select(2);
+
+        state.scrollToSelected(2, items);
+
+        assertThat(state.offset()).isEqualTo(1);
     }
 
     @Test

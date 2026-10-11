@@ -71,11 +71,13 @@ public final class ListItem {
 
     /**
      * Returns the height of this item in lines.
+     * <p>
+     * An item without lines, such as {@code ListItem.from("")}, is one blank line high.
      *
-     * @return the height in lines
+     * @return the height in lines, at least 1
      */
     public int height() {
-        return content.height();
+        return Math.max(1, content.height());
     }
 
     /**
@@ -109,7 +111,7 @@ public final class ListItem {
         Paragraph paragraph = style.equals(Style.EMPTY)
                 ? Paragraph.from(content)
                 : Paragraph.builder().text(content).style(style).build();
-        return SizedWidget.ofHeight(paragraph, content.height());
+        return SizedWidget.ofHeight(paragraph, height());
     }
 
     @Override

@@ -199,9 +199,13 @@ public class ListDemo {
                 Line.from("[Remy]: I'm building one now."),
                 Line.from("It even supports multiline text!")
             )),
+            // Blank spacer items keep their row and can hold the cursor
+            ListItem.from(""),
             ListItem.from(Line.from("[Gusteau]: With enough passion, yes.")),
+            ListItem.from(""),
             ListItem.from(Line.from("[Remy]: But can anyone build a TUI in Java?")),
             ListItem.from(Line.from("[Gusteau]: With enough passion, yes!")),
+            ListItem.from(""),
             ListItem.from(Line.from(
                 Span.raw("[System]: ").bold().fg(Color.CYAN),
                 Span.raw("List widget supports ").fg(Color.WHITE),
@@ -284,34 +288,25 @@ public class ListDemo {
      * Render a list with multiline items and custom styling.
      */
     private void renderMultilineList(Frame frame, Rect area) {
+        // Use the single source of items (which includes blank spacer rows) so navigation,
+        // the footer and the rendered list stay in sync
         ListWidget list = ListWidget.builder()
-            .items(
-                ListItem.from(Text.from(
-                    Line.from("[Remy]: I'm building one now."),
-                    Line.from("It even supports multiline text!")
-                )),
-                ListItem.from(Line.from("[Gusteau]: With enough passion, yes.")),
-                ListItem.from(Line.from("[Remy]: But can anyone build a TUI in Java?")),
-                ListItem.from(Line.from("[Gusteau]: With enough passion, yes!")),
-                ListItem.from(Line.from(
-                    Span.raw("[System]: ").bold().fg(Color.CYAN),
-                    Span.raw("List widget supports ").fg(Color.WHITE),
-                    Span.raw("styled text").bold().fg(Color.YELLOW),
-                    Span.raw(" in items!").fg(Color.WHITE)
-                )),
-                ListItem.from(Line.from(
-                    Span.raw("[Info]: ").bold().fg(Color.GREEN),
-                    Span.raw("You can use ").fg(Color.WHITE),
-                    Span.raw("multiple spans").italic().fg(Color.MAGENTA),
-                    Span.raw(" per line.").fg(Color.WHITE)
-                ))
-            )
+            .items(getMultilineItems().toArray(new ListItem[0]))
             .style(Style.EMPTY.fg(Color.WHITE))
             .highlightStyle(Style.EMPTY.fg(Color.YELLOW).italic())
             .highlightSymbol(Line.from("> ").fg(Color.RED))
             .build();
 
         frame.renderStatefulWidget(list, area, multilineListState);
+    }
+
+    /**
+     * Returns the first line of an item as plain text, or a label for a blank item, which has no lines.
+     */
+    private String firstLineText(ListItem item) {
+        return item.content().lines().isEmpty()
+            ? "(blank)"
+            : item.content().lines().get(0).rawContent();
     }
 
     private void renderFooter(Frame frame, Rect area) {
@@ -326,7 +321,7 @@ public class ListDemo {
             selected = multilineListState.selected();
             List<ListItem> items = getMultilineItems();
             selectedText = selected != null && selected < items.size()
-                ? items.get(selected).content().lines().get(0).rawContent()
+                ? firstLineText(items.get(selected))
                 : "None";
         }
 
