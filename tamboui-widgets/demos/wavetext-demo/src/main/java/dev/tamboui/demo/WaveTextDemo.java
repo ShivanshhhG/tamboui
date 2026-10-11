@@ -169,7 +169,7 @@ public class WaveTextDemo {
 
         renderExample(frame, rows.get(0), "Default (dark shadow on bright text)",
             WaveText.builder()
-                .text("Loading resources...")
+                .text("\uD83C\uDF0A \u52A0\u8F7D\u4E2D Loading \uD83D\uDE80")
                 .color(CYAN)
                 .build(),
             defaultState);

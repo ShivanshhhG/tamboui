@@ -67,6 +67,13 @@ class WaveTextElementTest extends AbstractElementTest {
     }
 
     @Test
+    @DisplayName("preferredWidth() counts two columns for a CJK character")
+    void preferredWidth_wideCharacters() {
+        WaveTextElement element = waveText("加载中...");
+        assertThat(element.preferredSize(-1, -1, null).widthOr(0)).isEqualTo(9);
+    }
+
+    @Test
     @DisplayName("preferredWidth() handles empty text")
     void preferredWidth_emptyText() {
         WaveTextElement element = waveText("");
@@ -189,5 +196,39 @@ class WaveTextElementTest extends AbstractElementTest {
         assertThat(buffer).hasSymbolAt(2, 0, "l");
         assertThat(buffer).hasSymbolAt(3, 0, "l");
         assertThat(buffer).hasSymbolAt(4, 0, "o");
+    }
+
+    @Test
+    @DisplayName("renders CJK text in a row in full, two cells per character")
+    void rendersWideCharactersInRow() {
+        Rect area = new Rect(0, 0, 12, 1);
+        Buffer buffer = Buffer.empty(area);
+        Frame frame = Frame.forTesting(buffer);
+
+        row(waveText("加载中..."), text("|"))
+            .render(frame, area, RenderContext.empty());
+
+        assertThat(buffer)
+            .hasSymbolAt(0, 0, "加")
+            .hasSymbolAt(1, 0, "")
+            .hasSymbolAt(2, 0, "载")
+            .hasSymbolAt(4, 0, "中")
+            .hasRow(0, "加载中...|  ");
+    }
+
+    @Test
+    @DisplayName("renders an emoji whole")
+    void rendersEmojiWhole() {
+        Rect area = new Rect(0, 0, 12, 1);
+        Buffer buffer = Buffer.empty(area);
+        Frame frame = Frame.forTesting(buffer);
+
+        waveText("🚀 Loading")
+            .render(frame, area, RenderContext.empty());
+
+        assertThat(buffer)
+            .hasSymbolAt(0, 0, "🚀")
+            .hasSymbolAt(1, 0, "")
+            .hasRow(0, "🚀 Loading  ");
     }
 }

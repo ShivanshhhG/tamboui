@@ -14,6 +14,8 @@ import dev.tamboui.style.PropertyRegistry;
 import dev.tamboui.style.StandardProperties;
 import dev.tamboui.style.Style;
 import dev.tamboui.style.StylePropertyResolver;
+import dev.tamboui.text.CharWidth;
+import dev.tamboui.text.GraphemeClusters;
 import dev.tamboui.text.Line;
 import dev.tamboui.text.Span;
 import dev.tamboui.widget.Widget;
@@ -179,24 +181,31 @@ public final class Gauge implements Widget {
         int labelX = gaugeArea.left() + (totalWidth - labelWidth) / 2;
         int labelY = gaugeArea.top() + (gaugeArea.height() - 1) / 2;
 
-        // Render label with appropriate style based on position
+        // Blank the cells under the label in the style of the bar beneath them (the gauge style
+        // over the filled portion, the widget style elsewhere); each span's style is patched onto it
+        int labelLeft = Math.max(labelX, gaugeArea.left());
+        int labelRight = Math.min(labelX + labelWidth, gaugeArea.right());
+        for (int x = labelLeft; x < labelRight; x++) {
+            Style barStyle = x < gaugeArea.left() + fullCells ? gaugeStyle : style;
+            buffer.set(x, labelY, new Cell(" ", barStyle));
+        }
+
+        // Write the label a character at a time, as wide as it is on screen: an emoji or a CJK
+        // character takes two cells. A character that the gauge's edges would cut in half, or a
+        // zero-width one on its own, is left out.
         int col = labelX;
         for (Span span : labelLine.spans()) {
             String content = span.content();
-            for (int i = 0; i < content.length(); i++) {
-                if (col >= gaugeArea.left() && col < gaugeArea.right()) {
-                    String ch = String.valueOf(content.charAt(i));
-                    // Use inverted style if over filled portion
-                    Style cellStyle;
-                    if (col < gaugeArea.left() + fullCells) {
-                        // Over filled part - use style with inverted colors for visibility
-                        cellStyle = gaugeStyle.patch(span.style());
-                    } else {
-                        cellStyle = style.patch(span.style());
-                    }
-                    buffer.set(col, labelY, new Cell(ch, cellStyle));
+            int i = 0;
+            while (i < content.length()) {
+                int end = GraphemeClusters.clusterEnd(content, i);
+                String character = content.substring(i, end);
+                int width = CharWidth.of(character);
+                if (width > 0 && col >= gaugeArea.left() && col + width <= gaugeArea.right()) {
+                    buffer.setString(col, labelY, character, span.style());
                 }
-                col++;
+                col += width;
+                i = end;
             }
         }
     }

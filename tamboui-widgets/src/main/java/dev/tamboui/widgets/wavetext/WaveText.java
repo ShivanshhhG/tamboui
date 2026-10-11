@@ -4,6 +4,9 @@
  */
 package dev.tamboui.widgets.wavetext;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
@@ -14,6 +17,8 @@ import dev.tamboui.style.PropertyRegistry;
 import dev.tamboui.style.StandardProperties;
 import dev.tamboui.style.Style;
 import dev.tamboui.style.StylePropertyResolver;
+import dev.tamboui.text.CharWidth;
+import dev.tamboui.text.GraphemeClusters;
 import dev.tamboui.widget.StatefulWidget;
 
 /**
@@ -147,16 +152,20 @@ public final class WaveText implements StatefulWidget<WaveTextState> {
             return;
         }
 
-        int textLen = text.length();
+        List<String> characters = splitCharacters(text);
+        int textLen = characters.size();
         long tick = state.tick();
 
         // Render each character with appropriate brightness
         int x = area.x();
         int y = area.y();
-        int maxChars = Math.min(textLen, area.width());
 
-        for (int i = 0; i < maxChars; i++) {
-            char c = text.charAt(i);
+        for (int i = 0; i < textLen; i++) {
+            String character = characters.get(i);
+            int width = CharWidth.of(character);
+            if (x + width > area.right()) {
+                break;
+            }
 
             // Calculate brightness for this character
             double brightness = calculateBrightness(i, textLen, tick);
@@ -165,15 +174,40 @@ public final class WaveText implements StatefulWidget<WaveTextState> {
             Color charColor = applyBrightness(color, brightness);
             Style charStyle = baseStyle.fg(charColor);
 
-            buffer.setString(x + i, y, String.valueOf(c), charStyle);
+            buffer.setString(x, y, character, charStyle);
+            x += width;
         }
+    }
+
+    /**
+     * Splits the text into the characters the wave moves over.
+     * <p>
+     * An emoji or a CJK character is one character that takes two cells, and combining
+     * marks, variation selectors and joined emoji stay with the character before them.
+     * A zero-width character on its own is left out.
+     *
+     * @param text the text to split
+     * @return the characters, in order
+     */
+    private static List<String> splitCharacters(String text) {
+        List<String> characters = new ArrayList<>();
+        int i = 0;
+        while (i < text.length()) {
+            int end = GraphemeClusters.clusterEnd(text, i);
+            String character = text.substring(i, end);
+            if (CharWidth.of(character) > 0) {
+                characters.add(character);
+            }
+            i = end;
+        }
+        return characters;
     }
 
     /**
      * Calculates the brightness for a character at the given position.
      *
      * @param charIndex the character index
-     * @param textLen   the total text length
+     * @param textLen   the number of characters in the text
      * @param tick      the current animation tick
      * @return the brightness (0.0-1.0)
      */

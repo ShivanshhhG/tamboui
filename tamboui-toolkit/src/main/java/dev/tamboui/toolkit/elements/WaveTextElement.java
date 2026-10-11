@@ -8,6 +8,7 @@ import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
 import dev.tamboui.style.StylePropertyResolver;
 import dev.tamboui.terminal.Frame;
+import dev.tamboui.text.CharWidth;
 import dev.tamboui.toolkit.element.RenderContext;
 import dev.tamboui.toolkit.element.Size;
 import dev.tamboui.toolkit.element.StyledElement;
@@ -213,7 +214,7 @@ public final class WaveTextElement extends StyledElement<WaveTextElement> {
 
     @Override
     public Size preferredSize(int availableWidth, int availableHeight, RenderContext context) {
-        int width = text != null ? text.length() : 0;
+        int width = text != null ? CharWidth.of(text) : 0;
         return Size.of(width, 1);
     }
 

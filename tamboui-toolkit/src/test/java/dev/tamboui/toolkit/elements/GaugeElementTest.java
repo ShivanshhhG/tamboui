@@ -96,6 +96,43 @@ class GaugeElementTest extends AbstractElementTest {
     }
 
     @Test
+    @DisplayName("GaugeElement label keeps an emoji whole in two cells")
+    void labelWithEmoji() {
+        Rect area = new Rect(0, 0, 20, 1);
+        Buffer buffer = Buffer.empty(area);
+        Frame frame = Frame.forTesting(buffer);
+
+        gauge(0.5)
+            .label("🔥 50%")
+            .render(frame, area, RenderContext.empty());
+
+        // "🔥 50%" is 6 columns wide, centered in 20 = starts at position 7
+        assertThat(buffer.get(7, 0).symbol()).isEqualTo("🔥");
+        assertThat(buffer.get(8, 0).symbol()).as("second cell of 🔥").isEmpty();
+        assertThat(buffer.get(9, 0).symbol()).isEqualTo(" ");
+        assertThat(buffer.get(10, 0).symbol()).isEqualTo("5");
+    }
+
+    @Test
+    @DisplayName("GaugeElement label with CJK characters is centered by display width")
+    void labelWithCjkCharacters() {
+        Rect area = new Rect(0, 0, 20, 1);
+        Buffer buffer = Buffer.empty(area);
+        Frame frame = Frame.forTesting(buffer);
+
+        gauge(0.5)
+            .label("下载中 50%")
+            .render(frame, area, RenderContext.empty());
+
+        // Each CJK character takes 2 columns: the label is 10 wide, centered in 20 = starts at position 5
+        assertThat(buffer.get(5, 0).symbol()).isEqualTo("下");
+        assertThat(buffer.get(6, 0).symbol()).as("second cell of 下").isEmpty();
+        assertThat(buffer.get(7, 0).symbol()).isEqualTo("载");
+        assertThat(buffer.get(9, 0).symbol()).isEqualTo("中");
+        assertThat(buffer.get(12, 0).symbol()).isEqualTo("5");
+    }
+
+    @Test
     @DisplayName("Empty area does not render")
     void emptyAreaNoRender() {
         Rect emptyArea = new Rect(0, 0, 0, 0);

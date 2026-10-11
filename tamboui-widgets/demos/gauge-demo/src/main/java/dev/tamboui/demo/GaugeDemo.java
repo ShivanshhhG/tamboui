@@ -235,7 +235,7 @@ public class GaugeDemo {
         int downloadProgress = (progress * 2) % 101;
         Gauge download = Gauge.builder()
             .percent(downloadProgress)
-            .label("Download")
+            .label("\u2B07\uFE0F Download")
             .gaugeStyle(Style.EMPTY.fg(Color.BLUE))
             .block(Block.builder()
                 .borders(Borders.ALL)
@@ -248,7 +248,7 @@ public class GaugeDemo {
         int uploadProgress = (progress * 3) % 101;
         Gauge upload = Gauge.builder()
             .percent(uploadProgress)
-            .label("Upload")
+            .label("\u2B06\uFE0F \u4E0A\u4F20")
             .gaugeStyle(Style.EMPTY.fg(Color.MAGENTA))
             .block(Block.builder()
                 .borders(Borders.ALL)
@@ -261,7 +261,7 @@ public class GaugeDemo {
         int cpuProgress = 100 - progress;
         Gauge cpu = Gauge.builder()
             .percent(cpuProgress)
-            .label("CPU: " + cpuProgress + "%")
+            .label("\uD83D\uDCBB CPU: " + cpuProgress + "%")
             .gaugeStyle(Style.EMPTY.fg(cpuProgress > 80 ? Color.RED : Color.GREEN))
             .block(Block.builder()
                 .borders(Borders.ALL)
