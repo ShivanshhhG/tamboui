@@ -4,7 +4,9 @@
  */
 package dev.tamboui.tui;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -74,6 +76,7 @@ public final class TerminalInputReader implements Runnable {
     public void stop(long timeoutMs) {
         Thread t = thread;
         if (t != null && t.isAlive()) {
+            t.interrupt();
             try {
                 t.join(timeoutMs);
             } catch (InterruptedException e) {
@@ -103,6 +106,12 @@ public final class TerminalInputReader implements Runnable {
                     eventQueue.offer(event);
                     consecutiveErrors = 0;
                 }
+            } catch (EOFException e) {
+                running.set(false);
+                break;
+            } catch (InterruptedIOException e) {
+                running.set(false);
+                break;
             } catch (IOException e) {
                 consecutiveErrors++;
                 if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {

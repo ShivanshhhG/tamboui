@@ -4,7 +4,15 @@
  */
 package dev.tamboui.tui.event;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import dev.tamboui.terminal.TestBackend;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class EventParserTest {
 
@@ -58,6 +67,16 @@ class EventParserTest {
     }
 
     @Test
+    @DisplayName("EOF is reported separately from an input timeout")
+    void eofDoesNotLookLikeTimeout() {
+        QueueBackend backend = new QueueBackend(-1);
+
+        assertThatThrownBy(() -> EventParser.readEvent(backend, 0))
+            .isInstanceOf(EOFException.class)
+            .hasMessageContaining("Terminal input closed");
+    }
+
+    @Test
     @DisplayName("bracketed paste emits PasteEvent with full content")
     void bracketedPasteEmitsPasteEvent() throws IOException {
         // ESC[200~ hello ESC[201~
@@ -86,6 +105,84 @@ class EventParserTest {
 
         assertThat(event).isInstanceOf(PasteEvent.class);
         assertThat(((PasteEvent) event).text()).isEqualTo("😀");
+    }
+
+    @Test
+    @DisplayName("bracketed paste that pauses half-way is one PasteEvent, not a paste followed by keys")
+    void bracketedPasteWithPauseIsOnePasteEvent() throws IOException {
+        // -2 is a read that times out: the rest of the paste arrives later, as over SSH
+        QueueBackend backend = new QueueBackend(
+            27, '[', '2', '0', '0', '~',
+            'a', 'b', -2,
+            'c', '\r', 'd',
+            27, '[', '2', '0', '1', '~'
+        );
+
+        Event event = EventParser.readEvent(backend, 0);
+
+        assertThat(event).isInstanceOf(PasteEvent.class);
+        assertThat(((PasteEvent) event).text()).isEqualTo("abc\rd");
+        assertThat(EventParser.readEvent(backend, 0)).isNull();
+    }
+
+    @Test
+    @DisplayName("bracketed paste that pauses inside the end marker does not keep the marker as text")
+    void bracketedPasteWithPauseInEndMarker() throws IOException {
+        QueueBackend backend = new QueueBackend(
+            27, '[', '2', '0', '0', '~',
+            'a', 'b', 'c',
+            27, -2, '[', '2', '0', '1', '~'
+        );
+
+        Event event = EventParser.readEvent(backend, 0);
+
+        assertThat(event).isInstanceOf(PasteEvent.class);
+        assertThat(((PasteEvent) event).text()).isEqualTo("abc");
+        assertThat(EventParser.readEvent(backend, 0)).isNull();
+    }
+
+    @Test
+    @DisplayName("EOF in a paste does not emit its partial content")
+    void bracketedPasteEofDiscardsPartialContent() {
+        QueueBackend backend = new QueueBackend(27, '[', '2', '0', '0', '~', 'a', 'b', -1);
+
+        assertThatThrownBy(() -> EventParser.readEvent(backend, 0))
+            .isInstanceOf(EOFException.class)
+            .hasMessageContaining("bracketed paste");
+    }
+
+    @Test
+    @DisplayName("paste waits past two seconds without emitting its newline as an Enter key")
+    void bracketedPasteWaitsForEndMarkerAfterLongPause() {
+        DelayedBackend backend = new DelayedBackend();
+        backend.type("\u001b[200~ab");
+        ScheduledExecutorService later = Executors.newSingleThreadScheduledExecutor();
+        later.schedule(() -> backend.type("c\rd\u001b[201~"), 2100, TimeUnit.MILLISECONDS);
+        try {
+            Event event = assertTimeoutPreemptively(Duration.ofSeconds(6), () -> EventParser.readEvent(backend, 0));
+            assertThat(event).isInstanceOf(PasteEvent.class);
+            assertThat(((PasteEvent) event).text()).isEqualTo("abc\rd");
+        } finally {
+            later.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("large paste is delivered intact, then normal keys resume")
+    void largePasteIsNotTruncated() throws IOException {
+        int[] input = new int[6 + 1_000_001 + 6 + 1];
+        int[] start = {27, '[', '2', '0', '0', '~'};
+        int[] end = {27, '[', '2', '0', '1', '~'};
+        System.arraycopy(start, 0, input, 0, start.length);
+        Arrays.fill(input, start.length, input.length - end.length - 1, 'x');
+        System.arraycopy(end, 0, input, input.length - end.length - 1, end.length);
+        input[input.length - 1] = 'q';
+        QueueBackend backend = new QueueBackend(input);
+
+        Event event = EventParser.readEvent(backend, 0);
+        assertThat(event).isInstanceOf(PasteEvent.class);
+        assertThat(((PasteEvent) event).text()).hasSize(1_000_001).startsWith("xxx").endsWith("xxx");
+        assertThat(((KeyEvent) EventParser.readEvent(backend, 0)).isChar('q')).isTrue();
     }
 
     @Test
@@ -494,6 +591,35 @@ class EventParserTest {
                 return -2;
             }
             return input[index];
+        }
+    }
+
+    private static final class DelayedBackend extends TestBackend {
+        private final BlockingQueue<Integer> input = new LinkedBlockingQueue<>();
+
+        private DelayedBackend() {
+            super(80, 24);
+        }
+
+        void type(String text) {
+            text.codePoints().forEach(input::offer);
+        }
+
+        @Override
+        public int read(int timeoutMs) {
+            try {
+                Integer c = input.poll(timeoutMs, TimeUnit.MILLISECONDS);
+                return c == null ? -2 : c;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return -2;
+            }
+        }
+
+        @Override
+        public int peek(int timeoutMs) {
+            Integer c = input.peek();
+            return c == null ? -2 : c;
         }
     }
 

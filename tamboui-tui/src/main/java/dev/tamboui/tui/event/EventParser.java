@@ -4,7 +4,10 @@
  */
 package dev.tamboui.tui.event;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.util.concurrent.locks.LockSupport;
 
 import dev.tamboui.terminal.Backend;
 import dev.tamboui.tui.bindings.BindingSets;
@@ -20,6 +23,7 @@ public final class EventParser {
 
     private static final int ESC = 27;
     private static final int PEEK_TIMEOUT = 50;
+    private static final String PASTE_END = "\u001b[201~";
 
     private EventParser() {
     }
@@ -30,6 +34,7 @@ public final class EventParser {
      * @param backend the terminal backend
      * @param timeout timeout in milliseconds for the initial read
      * @return the parsed event, or null if no event was available
+     * @throws EOFException if terminal input ends
      * @throws IOException if an I/O error occurs
      */
     public static Event readEvent(Backend backend, int timeout) throws IOException {
@@ -43,6 +48,7 @@ public final class EventParser {
      * @param timeout  timeout in milliseconds for the initial read
      * @param bindings the bindings for event semantic action matching
      * @return the parsed event, or null if no event was available
+     * @throws EOFException if terminal input ends
      * @throws IOException if an I/O error occurs
      */
     public static Event readEvent(Backend backend, int timeout, Bindings bindings) throws IOException {
@@ -54,8 +60,7 @@ public final class EventParser {
         }
 
         if (c == -1) {
-            // EOF
-            return null;
+            throw new EOFException("Terminal input closed");
         }
 
         return parseInput(c, backend, bindings);
@@ -193,7 +198,7 @@ public final class EventParser {
     private static Event parseCSIWithParams(String params, int terminator, Backend backend, Bindings bindings) throws IOException {
         // Bracketed paste start: ESC[200~
         if (terminator == '~' && "200".equals(params)) {
-            return readPasteContent(backend, bindings);
+            return readPasteContent(backend);
         }
 
         // Parse sequences like "1~" (Home), "4~" (End), "5~" (PgUp), etc.
@@ -209,29 +214,40 @@ public final class EventParser {
         return KeyEvent.ofKey(KeyCode.UNKNOWN, bindings);
     }
 
-    private static Event readPasteContent(Backend backend, Bindings bindings) throws IOException {
+    private static Event readPasteContent(Backend backend) throws IOException {
         StringBuilder sb = new StringBuilder();
         while (true) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedIOException("Interrupted while reading bracketed paste");
+            }
             int c = backend.read(PEEK_TIMEOUT);
-            if (c < 0) break;
-            if (c != ESC) {
-                sb.appendCodePoint(c);
+            if (c == -1) {
+                throw new EOFException("Terminal input closed during bracketed paste");
+            }
+            if (c == -2) {
+                // A backend may return early; avoid spinning until the next chunk arrives.
+                LockSupport.parkNanos(1_000_000L);
                 continue;
             }
-            // ESC seen — peek-before-consume to match [201~
-            if (backend.peek(PEEK_TIMEOUT) != '[')  { sb.appendCodePoint(ESC); continue; }
-            backend.read(PEEK_TIMEOUT); // consume '['
-            if (backend.peek(PEEK_TIMEOUT) != '2')  { sb.appendCodePoint(ESC); sb.appendCodePoint('['); continue; }
-            backend.read(PEEK_TIMEOUT);
-            if (backend.peek(PEEK_TIMEOUT) != '0')  { sb.appendCodePoint(ESC); sb.appendCodePoint('['); sb.appendCodePoint('2'); continue; }
-            backend.read(PEEK_TIMEOUT);
-            if (backend.peek(PEEK_TIMEOUT) != '1')  { sb.appendCodePoint(ESC); sb.appendCodePoint('['); sb.appendCodePoint('2'); sb.appendCodePoint('0'); continue; }
-            backend.read(PEEK_TIMEOUT);
-            if (backend.peek(PEEK_TIMEOUT) != '~')  { sb.appendCodePoint(ESC); sb.appendCodePoint('['); sb.appendCodePoint('2'); sb.appendCodePoint('0'); sb.appendCodePoint('1'); continue; }
-            backend.read(PEEK_TIMEOUT); // consume '~'
-            break; // ESC[201~ matched — end of paste
+            sb.appendCodePoint(c);
+            if (endsWith(sb, PASTE_END)) {
+                sb.setLength(sb.length() - PASTE_END.length());
+                return new PasteEvent(sb.toString());
+            }
         }
-        return new PasteEvent(sb.toString());
+    }
+
+    private static boolean endsWith(StringBuilder sb, String suffix) {
+        int offset = sb.length() - suffix.length();
+        if (offset < 0) {
+            return false;
+        }
+        for (int i = 0; i < suffix.length(); i++) {
+            if (sb.charAt(offset + i) != suffix.charAt(i)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static Event parseVT(String params, Bindings bindings) {
