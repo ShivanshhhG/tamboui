@@ -269,6 +269,16 @@ class CssParserTest {
     }
 
     @Test
+    void handlesAdjacentComments() {
+        Stylesheet beforeRule = CssParser.parse("/* a *//* b */ Panel { color: red; }");
+        Stylesheet inRule = CssParser.parse("Panel { color: red; /* x *//* y */ }");
+
+        assertThat(beforeRule.rules()).hasSize(1);
+        assertThat(inRule.rules()).hasSize(1);
+        assertThat(inRule.rules().get(0).declarations().get("color").raw()).isEqualTo("red");
+    }
+
+    @Test
     void preservesSourceOrder() {
         String css = "Panel { color: red; }\nButton { color: blue; }\nLabel { color: green; }";
         Stylesheet stylesheet = CssParser.parse(css);

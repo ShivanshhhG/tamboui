@@ -126,6 +126,17 @@ class CssLexerTest {
     }
 
     @Test
+    void skipsAdjacentComments() {
+        CssLexer lexer = new CssLexer("Panel /* a *//* b */ Button");
+        List<Token> tokens = lexer.tokenizeFiltered();
+
+        assertThat(tokens).hasSize(3);
+        assertThat(((Token.Ident) tokens.get(0)).value()).isEqualTo("Panel");
+        assertThat(((Token.Ident) tokens.get(1)).value()).isEqualTo("Button");
+        assertThat(tokens.get(2)).isInstanceOf(Token.EOF.class);
+    }
+
+    @Test
     void tokenizesCompleteRule() {
         String css = ".error { color: red; text-style: bold; }";
         CssLexer lexer = new CssLexer(css);

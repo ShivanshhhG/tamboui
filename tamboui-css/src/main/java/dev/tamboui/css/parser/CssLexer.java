@@ -83,8 +83,8 @@ public final class CssLexer {
     private Token nextToken() {
         char c = peek();
 
-        // Skip comments
-        if (c == '/' && peekNext() == '*') {
+        // Skip comments, including several in a row
+        while (c == '/' && peekNext() == '*') {
             skipComment();
             if (isAtEnd()) {
                 return new Token.EOF(currentPosition());
