@@ -29,6 +29,9 @@ public final class RecordingBackend implements Backend {
     private final Backend delegate;
     private final RecordingConfig config;
     private final Size overrideSize;
+    // The screen as drawn so far. draw() runs on the render thread, while read() captures frames and plays the tape
+    // on the input thread, where Wait and Screenshot read the screen: the buffer, the frames and the capture state
+    // below are only used under the buffer's lock
     private final Buffer buffer;
     private final List<TimedFrame> frames;
     private final InteractionPlayer interactionPlayer;
@@ -73,25 +76,28 @@ public final class RecordingBackend implements Backend {
 
     @Override
     public void draw(DiffResult diff) throws IOException {
-        // Apply updates to our buffer, iterating runs of adjacent changed cells
-        for (int run = 0, runs = diff.runCount(); run < runs; run++) {
-            int start = diff.runStart(run);
-            int end = start + diff.runLength(run);
-            int x = diff.xOf(start);
-            int y = diff.yOf(start);
-            for (int i = start; i < end; i++) {
-                buffer.set(x++, y, diff.cellAt(i));
+        synchronized (buffer) {
+            // Apply updates to our buffer, iterating runs of adjacent changed cells
+            for (int run = 0, runs = diff.runCount(); run < runs; run++) {
+                int start = diff.runStart(run);
+                int end = start + diff.runLength(run);
+                int x = diff.xOf(start);
+                int y = diff.yOf(start);
+                for (int i = start; i < end; i++) {
+                    buffer.set(x++, y, diff.cellAt(i));
+                }
             }
-        }
-        hasDrawn = true;
+            hasDrawn = true;
 
-        // Capture frame if recording
-        if (recording) {
-            captureFrame(true);
+            // Capture frame if recording
+            if (recording) {
+                captureFrame(true);
+            }
         }
         // Don't delegate - headless recording
     }
 
+    // Called under the buffer's lock
     private void captureFrame(boolean drawn) {
         long nowNanos = System.nanoTime();
         // The frames of a Hide section are left out, and so is the time it took, so playback does not pause there
@@ -150,7 +156,9 @@ public final class RecordingBackend implements Backend {
 
     @Override
     public void clear() throws IOException {
-        buffer.clear();
+        synchronized (buffer) {
+            buffer.clear();
+        }
     }
 
     @Override
@@ -238,21 +246,22 @@ public final class RecordingBackend implements Backend {
     public int read(int timeoutMs) throws IOException {
         // If we have interactions, play them back
         if (!interactionPlayer.isFinished()) {
+            // Not under the lock: a Sleep in the tape waits in here
             int b = interactionPlayer.nextCodePoint(Math.min(timeoutMs, 100));
             // Capture frame during read to ensure we get frames during Sleep commands
             // Only capture if draw() has been called (TUI demos), not for inline demos
             // which use System.out and AnsiTerminalCapture instead
-            if (recording && hasDrawn) {
-                captureFrame(false);
+            synchronized (buffer) {
+                if (recording && hasDrawn) {
+                    captureFrame(false);
+                }
             }
             return b;
         }
 
         // Interactions finished - if we HAD interactions, exit now
         // (the recording file should end with a quit key)
-        if (!interactionPlayer.hasNoInteractions() && !closed) {
-            recording = false;
-            closed = true;
+        if (!interactionPlayer.hasNoInteractions() && stop()) {
             try {
                 writeCastFromDrawFrames();
             } catch (IOException e) {
@@ -262,8 +271,7 @@ public final class RecordingBackend implements Backend {
         }
 
         // No interactions defined - wait for duration limit
-        if (!isRecording() && !closed) {
-            closed = true;
+        if (!isRecording() && stop()) {
             try {
                 writeCastFromDrawFrames();
             } catch (IOException e) {
@@ -289,42 +297,59 @@ public final class RecordingBackend implements Backend {
 
     @Override
     public void close() throws IOException {
-        if (closed) {
+        if (!stop()) {
             return;
         }
-        closed = true;
-        recording = false;
 
         // Write cast file only if we have frames from Backend.draw() calls (TUI demos)
         // System.out capture is handled by the shutdown hook
-        if (!frames.isEmpty()) {
-            writeCastFromDrawFrames();
-        }
+        writeCastFromDrawFrames();
 
         // Close delegate
         delegate.close();
     }
 
-    private void writeCastFromDrawFrames() throws IOException {
-        // Write cast file from Backend.draw() captured frames (TUI demos)
-        // For inline demos (no draw() calls), frames will be empty and we let
-        // the shutdown hook write the System.out captured frames instead
-        if (frames.isEmpty()) {
-            return;  // Let shutdown hook handle AnsiTerminalCapture frames
+    /**
+     * Ends the recording. The render thread can close the backend while the input thread reaches the end of the
+     * tape or the duration limit, so this checks and sets {@code closed} under the lock: only the caller that gets
+     * {@code true} writes the cast. No frame is captured after this.
+     */
+    private boolean stop() {
+        synchronized (buffer) {
+            if (closed) {
+                return false;
+            }
+            closed = true;
+            recording = false;
+            return true;
         }
+    }
 
-        // A draw since the last captured frame fell within the fps throttle: add the screen as it
-        // is now, or the recording ends on the frame before it
-        if (pendingDrawMs >= 0) {
-            frames.add(new TimedFrame(buffer.copy(), pendingDrawMs));
-            pendingDrawMs = -1;
+    private void writeCastFromDrawFrames() throws IOException {
+        List<TimedFrame> recorded;
+        synchronized (buffer) {
+            // Write cast file from Backend.draw() captured frames (TUI demos)
+            // For inline demos (no draw() calls), frames will be empty and we let
+            // the shutdown hook write the System.out captured frames instead
+            if (frames.isEmpty()) {
+                return;  // Let shutdown hook handle AnsiTerminalCapture frames
+            }
+
+            // A draw since the last captured frame fell within the fps throttle: add the screen as it
+            // is now, or the recording ends on the frame before it
+            if (pendingDrawMs >= 0) {
+                frames.add(new TimedFrame(buffer.copy(), pendingDrawMs));
+                pendingDrawMs = -1;
+            }
+            // The recording has stopped, so no frame is added any more: write them outside the lock
+            recorded = new ArrayList<>(frames);
         }
 
         // We have draw() frames - uninstall System.out capture and write draw frames
         AnsiTerminalCapture.uninstall();
         RecordingConfig.clearActive();  // Prevent shutdown hook from also writing
 
-        AsciinemaAnimation animation = new AsciinemaAnimation(frames, config.fps());
+        AsciinemaAnimation animation = new AsciinemaAnimation(recorded, config.fps());
         String cast = animation.toCast();
 
         Path outputPath = config.outputPath();
@@ -335,6 +360,6 @@ public final class RecordingBackend implements Backend {
 
         Files.write(outputPath, cast.getBytes(StandardCharsets.UTF_8));
         System.out.println("Recording saved to: " + outputPath);
-        System.out.println("Frames captured: " + frames.size());
+        System.out.println("Frames captured: " + recorded.size());
     }
 }

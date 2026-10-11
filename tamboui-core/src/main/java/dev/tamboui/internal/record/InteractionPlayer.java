@@ -480,7 +480,7 @@ final class InteractionPlayer {
                 Interaction.Screenshot screenshot = (Interaction.Screenshot) interaction;
                 try {
                     Files.createDirectories(screenshot.path().getParent());
-                    export(buffer).toFile(screenshot.path());
+                    export(screen()).toFile(screenshot.path());
                 } catch (IOException e) {
                     throw new UncheckedIOException("Warning: Failed to write screenshot: " + e.getMessage(), e);
                 }
@@ -497,15 +497,16 @@ final class InteractionPlayer {
      * by newlines for Wait+Screen.
      */
     private boolean screenMatches(Interaction.WaitFor waitFor) {
-        if (buffer == null) {
+        Buffer current = screen();
+        if (current == null) {
             return false;
         }
-        Rect area = buffer.area();
+        Rect area = current.area();
         StringBuilder screen = new StringBuilder();
         for (int y = area.top(); y < area.bottom(); y++) {
             StringBuilder row = new StringBuilder();
             for (int x = area.left(); x < area.right(); x++) {
-                row.append(buffer.get(x, y).symbol());
+                row.append(current.get(x, y).symbol());
             }
             if (!waitFor.screen() && waitFor.pattern().matcher(row).find()) {
                 return true;
@@ -516,6 +517,19 @@ final class InteractionPlayer {
             screen.append(row);
         }
         return waitFor.screen() && waitFor.pattern().matcher(screen).find();
+    }
+
+    /**
+     * A copy of the screen, or null without one. The recording backend draws into the buffer on the render thread
+     * while the tape plays on the input thread, so the copy is taken under the buffer's lock, as the backend draws.
+     */
+    private Buffer screen() {
+        if (buffer == null) {
+            return null;
+        }
+        synchronized (buffer) {
+            return buffer.copy();
+        }
     }
 
     /**
