@@ -5,6 +5,7 @@
 package dev.tamboui.export.svg;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -81,6 +82,29 @@ final class SvgExporterTest {
             assertEquals(0.0, remainderToGrid(textLength, charWidth), 0.01,
                 "segment textLength must be a whole number of columns: " + textLength);
         }
+    }
+
+    @Test
+    void textAndTitleThatReadLikeTemplatePlaceholdersAreExportedAsWritten() {
+        String text = "{lines}{matrix}{backgrounds}{chrome}";
+        Buffer buffer = Buffer.empty(new Rect(0, 0, text.length(), 1));
+        buffer.setString(0, 0, text, Style.EMPTY);
+
+        String svg = export(buffer).as(Formats.SVG)
+            .options(o -> o.title("{matrix}{lines}").uniqueId("t"))
+            .toString();
+
+        assertEquals(Arrays.asList("{matrix}{lines}", text), textContents(svg));
+        assertEquals(1, svg.split("<clipPath id=\"t-line-0\"", -1).length - 1, "one clip path per line");
+    }
+
+    private static List<String> textContents(String svg) {
+        List<String> contents = new ArrayList<>();
+        Matcher matcher = Pattern.compile("<text[^>]*>(.*?)</text>").matcher(svg);
+        while (matcher.find()) {
+            contents.add(matcher.group(1));
+        }
+        return contents;
     }
 
     private static double remainderToGrid(double value, double unit) {

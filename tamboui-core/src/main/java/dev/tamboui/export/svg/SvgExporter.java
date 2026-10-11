@@ -16,6 +16,7 @@ import java.util.zip.Adler32;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.buffer.Cell;
 import dev.tamboui.export.ExportProperties;
+import dev.tamboui.internal.export.ExportTemplate;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
 import dev.tamboui.style.Modifier;
@@ -218,22 +219,22 @@ public final class SvgExporter {
             : buildBackgroundOnly(defaultBackground, terminalWidth, terminalHeight, marginLeft, marginTop);
 
         // Match Rich template variables
-        return DEFAULT_SVG_FORMAT
-            .replace("{unique_id}", uniqueId)
-            .replace("{char_width}", format(charWidth))
-            .replace("{char_height}", String.valueOf(charHeight))
-            .replace("{line_height}", format(lineHeight))
-            .replace("{terminal_width}", String.valueOf((int) Math.ceil(charWidth * widthCells - 1)))
-            .replace("{terminal_height}", String.valueOf((int) Math.ceil(heightCells * lineHeight - 1)))
-            .replace("{width}", String.valueOf(terminalWidth + marginWidth))
-            .replace("{height}", String.valueOf(terminalHeight + marginHeight))
-            .replace("{terminal_x}", String.valueOf(marginLeft + paddingLeft))
-            .replace("{terminal_y}", String.valueOf(marginTop + paddingTop))
-            .replace("{styles}", styles.toString())
-            .replace("{chrome}", chromeContent)
-            .replace("{backgrounds}", backgrounds.toString())
-            .replace("{matrix}", matrix.toString())
-            .replace("{lines}", lines.toString());
+        return ExportTemplate.fill(DEFAULT_SVG_FORMAT,
+            "unique_id", uniqueId,
+            "char_width", format(charWidth),
+            "char_height", String.valueOf(charHeight),
+            "line_height", format(lineHeight),
+            "terminal_width", String.valueOf((int) Math.ceil(charWidth * widthCells - 1)),
+            "terminal_height", String.valueOf((int) Math.ceil(heightCells * lineHeight - 1)),
+            "width", String.valueOf(terminalWidth + marginWidth),
+            "height", String.valueOf(terminalHeight + marginHeight),
+            "terminal_x", String.valueOf(marginLeft + paddingLeft),
+            "terminal_y", String.valueOf(marginTop + paddingTop),
+            "styles", styles.toString(),
+            "chrome", chromeContent,
+            "backgrounds", backgrounds.toString(),
+            "matrix", matrix.toString(),
+            "lines", lines.toString());
     }
 
     private static String buildBackgroundOnly(

@@ -72,6 +72,19 @@ final class HtmlExporterTest {
     }
 
     @Test
+    void textThatReadsLikeTemplatePlaceholdersIsExportedAsWritten() {
+        String text = "{code}{stylesheet}{foreground}{background}";
+        Buffer buffer = Buffer.empty(new Rect(0, 0, text.length(), 1));
+        buffer.setString(0, 0, text, Style.EMPTY.fg(Color.CYAN));
+
+        String html = export(buffer).as(Formats.HTML).toString();
+
+        String code = html.substring(html.indexOf("<code"), html.indexOf("</code>"));
+        assertEquals("<code style=\"font-family:inherit\"><span class=\"r1\">" + text + "</span>", code);
+        assertTrue(html.contains("color: #c5c8c6;\n    background-color: #292929;"), "the template's own placeholders are filled");
+    }
+
+    @Test
     void wideGlyphsUseSharedClassInStylesheetMode() {
         Buffer buffer = Buffer.empty(new Rect(0, 0, 6, 1));
         buffer.setString(0, 0, "\u4e16\u754c|", Style.EMPTY.fg(Color.CYAN));
