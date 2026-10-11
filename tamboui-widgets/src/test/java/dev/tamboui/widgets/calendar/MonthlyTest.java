@@ -11,6 +11,7 @@ import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 
+import dev.tamboui.assertj.BufferAssertions;
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.buffer.Cell;
 import dev.tamboui.layout.Rect;
@@ -366,6 +367,90 @@ class MonthlyTest {
         // Should contain day 28 but not 29 in February context
         String content = extractBufferContent(buffer, 0, 0, 25, 8);
         assertThat(content).contains("28");
+    }
+
+    @Test
+    void japaneseWeekdaysLineUpWithTheDayColumns() {
+        BufferAssertions.assertThat(renderOctober2025(Locale.JAPANESE)).hasContent(
+            "     10月 2025      ",
+            "月 火 水 木 金 土 日",
+            "       1  2  3  4  5",
+            " 6  7  8  9 10 11 12",
+            "13 14 15 16 17 18 19",
+            "20 21 22 23 24 25 26",
+            "27 28 29 30 31      ");
+    }
+
+    @Test
+    void koreanWeekdaysLineUpWithTheDayColumns() {
+        BufferAssertions.assertThat(renderOctober2025(Locale.KOREAN)).hasContent(
+            "     10월 2025      ",
+            "월 화 수 목 금 토 일",
+            "       1  2  3  4  5",
+            " 6  7  8  9 10 11 12",
+            "13 14 15 16 17 18 19",
+            "20 21 22 23 24 25 26",
+            "27 28 29 30 31      ");
+    }
+
+    @Test
+    void chineseWeekdaysUseTheNarrowNamesWhenTheShortNamesLookAlike() {
+        // The short names 周一 to 周日 all fit two columns as 周
+        BufferAssertions.assertThat(renderOctober2025(Locale.CHINESE)).hasContent(
+            "     十月 2025      ",
+            "一 二 三 四 五 六 日",
+            "       1  2  3  4  5",
+            " 6  7  8  9 10 11 12",
+            "13 14 15 16 17 18 19",
+            "20 21 22 23 24 25 26",
+            "27 28 29 30 31      ");
+    }
+
+    @Test
+    void englishWeekdaysKeepTheirFirstTwoLetters() {
+        BufferAssertions.assertThat(renderOctober2025(Locale.ENGLISH)).hasContent(
+            "    October 2025    ",
+            "Mo Tu We Th Fr Sa Su",
+            "       1  2  3  4  5",
+            " 6  7  8  9 10 11 12",
+            "13 14 15 16 17 18 19",
+            "20 21 22 23 24 25 26",
+            "27 28 29 30 31      ");
+    }
+
+    @Test
+    void fitToDayWidthCutsAndPadsByDisplayWidth() {
+        assertThat(Monthly.fitToDayWidth("Mon")).isEqualTo("Mo");
+        assertThat(Monthly.fitToDayWidth("A")).isEqualTo(" A");
+        assertThat(Monthly.fitToDayWidth("月")).isEqualTo("月");
+        assertThat(Monthly.fitToDayWidth("周一")).isEqualTo("周");
+        assertThat(Monthly.fitToDayWidth("a月")).isEqualTo(" a");
+        assertThat(Monthly.fitToDayWidth("")).isEqualTo("  ");
+        assertThat(Monthly.fitToDayWidth(null)).isEqualTo("  ");
+    }
+
+    @Test
+    void fitToDayWidthKeepsZwjSequencesWhole() {
+        assertThat(Monthly.fitToDayWidth("👩\u200D💻")).isEqualTo("👩\u200D💻");
+        assertThat(Monthly.fitToDayWidth("👨\u200D👩\u200D👧 family")).isEqualTo("👨\u200D👩\u200D👧");
+        assertThat(Monthly.fitToDayWidth("a👩\u200D💻")).isEqualTo(" a");
+    }
+
+    @Test
+    void fitToDayWidthKeepsAGraphemeClusterWiderThanTwoColumnsWhole() {
+        // Tibetan for Saturday starts with a stacked letter that is three columns wide
+        // for CharWidth: it is kept whole rather than cut, or dropped for a blank label
+        assertThat(Monthly.fitToDayWidth("\u0F66\u0FA4\u0F7A\u0F53")).isEqualTo("\u0F66\u0FA4\u0F7A");
+    }
+
+    private static Buffer renderOctober2025(Locale locale) {
+        Monthly calendar = Monthly.of(LocalDate.of(2025, 10, 15), d -> Style.EMPTY, locale)
+            .showMonthHeader(Style.EMPTY)
+            .showWeekdaysHeader(Style.EMPTY);
+        Rect area = new Rect(0, 0, 20, 7);
+        Buffer buffer = Buffer.empty(area);
+        calendar.render(area, buffer);
+        return buffer;
     }
 
     private String extractBufferContent(Buffer buffer, int startX, int startY, int width, int height) {

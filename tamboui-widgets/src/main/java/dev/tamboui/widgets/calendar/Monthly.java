@@ -9,12 +9,15 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.TextStyle;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
 
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Style;
+import dev.tamboui.text.CharWidth;
+import dev.tamboui.text.GraphemeClusters;
 import dev.tamboui.widget.Widget;
 import dev.tamboui.widgets.block.Block;
 
@@ -39,6 +42,7 @@ import dev.tamboui.widgets.block.Block;
  */
 public final class Monthly implements Widget {
 
+    private static final int DAY_WIDTH = 2;  // Width of a day number, and of a weekday label
     private static final int CELL_WIDTH = 3;  // Width per day cell (2 digits + space)
     private static final int CALENDAR_WIDTH = CELL_WIDTH * 7 - 1;  // 7 days, minus trailing space
 
@@ -236,7 +240,7 @@ public final class Monthly implements Widget {
         String header = monthName + " " + yearMonth.getYear();
 
         // Center the header
-        int x = area.x() + Math.max(0, (area.width() - header.length()) / 2);
+        int x = area.x() + Math.max(0, (area.width() - CharWidth.of(header)) / 2);
         buffer.setString(x, y, header, monthHeaderStyle);
 
         return y + 1;
@@ -247,7 +251,7 @@ public final class Monthly implements Widget {
             return y;
         }
 
-        String[] weekdayAbbrev = getWeekdayAbbrev(locale);
+        String[] weekdayLabels = weekdayLabels(locale);
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 7; i++) {
@@ -255,11 +259,12 @@ public final class Monthly implements Widget {
             if (i > 0) {
                 sb.append(" ");
             }
-            sb.append(weekdayAbbrev[dayIndex]);
+            sb.append(weekdayLabels[dayIndex]);
         }
 
-        int x = area.x() + Math.max(0, (area.width() - sb.length()) / 2);
-        buffer.setString(x, y, sb.toString(), weekdaysHeaderStyle);
+        String header = sb.toString();
+        int x = area.x() + Math.max(0, (area.width() - CharWidth.of(header)) / 2);
+        buffer.setString(x, y, header, weekdaysHeaderStyle);
 
         return y + 1;
     }
@@ -359,59 +364,73 @@ public final class Monthly implements Widget {
     }
 
     /**
-     * Returns an array of two-character weekday abbreviations for the given locale.
+     * Returns the weekday labels for the given locale, one per day column.
      * <p>
-     * Each abbreviation is derived from the full standalone display name of the day,
-     * capitalized according to the locale rules, and then truncated (or left-padded)
-     * to exactly two Unicode characters.
+     * Each label is the day's short standalone name, capitalized according to the
+     * locale rules and fitted to the width of a day number: "Mo" in English, "月" in
+     * Japanese. Where that makes two days look the same, as "周一" and "周二" in
+     * Chinese both fit as "周", the narrow names ("一", "二") are used instead.
      * <p>
      * The returned array contains seven elements, one for each day of the week,
      * ordered from Monday to Sunday as defined by {@link DayOfWeek#values()}.
      *
      * @param locale the locale to use for day-of-week display names
-     * @return a seven-element array of two-character weekday abbreviations
+     * @return a seven-element array of weekday labels, each two columns wide
      * @see DayOfWeek#getDisplayName(TextStyle, Locale)
      */
-    private static String[] getWeekdayAbbrev(Locale locale) {
-      return Arrays.stream(DayOfWeek.values())
-              .map(dayOfWeek -> dayOfWeek.getDisplayName(TextStyle.SHORT_STANDALONE, locale))
-              .map(dayOfWeek -> capitalize(dayOfWeek, locale))
-              .map(Monthly::firstTwoChars)
-              .toArray(String[]::new);
+    private static String[] weekdayLabels(Locale locale) {
+        String[] labels = weekdayLabels(locale, TextStyle.SHORT_STANDALONE);
+        if (!allDistinct(labels)) {
+            String[] narrowLabels = weekdayLabels(locale, TextStyle.NARROW_STANDALONE);
+            if (allDistinct(narrowLabels)) {
+                return narrowLabels;
+            }
+        }
+        return labels;
+    }
+
+    private static String[] weekdayLabels(Locale locale, TextStyle textStyle) {
+        return Arrays.stream(DayOfWeek.values())
+            .map(dayOfWeek -> dayOfWeek.getDisplayName(textStyle, locale))
+            .map(name -> capitalize(name, locale))
+            .map(Monthly::fitToDayWidth)
+            .toArray(String[]::new);
+    }
+
+    private static boolean allDistinct(String[] labels) {
+        return new HashSet<>(Arrays.asList(labels)).size() == labels.length;
     }
 
     /**
-     * Returns the first two Unicode code points of the given string.
+     * Fits the given text to the two columns of a day number.
      * <p>
-     * If the string contains fewer than two code points, it is left-padded
-     * with spaces to ensure the result always represents exactly two characters.
-     * A {@code null} input is treated as an empty string.
+     * The text is cut to its first two columns, keeping whole grapheme clusters, and
+     * left-padded with spaces to exactly two columns. A first grapheme cluster that is
+     * wider than two columns on its own is kept whole rather than dropped. A {@code null}
+     * input is treated as an empty string.
      *
      * <pre>{@code
-     * firstTwoChars("Hello")  → "He"
-     * firstTwoChars("A")      → " A"
-     * firstTwoChars("")       → "  "
-     * firstTwoChars(null)     → "  "
-     * firstTwoChars("🎉🎄!") → "🎉🎄"
+     * fitToDayWidth("Hello")  → "He"
+     * fitToDayWidth("A")      → " A"
+     * fitToDayWidth("月")     → "月"
+     * fitToDayWidth("周一")   → "周"
+     * fitToDayWidth("a月")    → " a"
+     * fitToDayWidth(null)     → "  "
      * }</pre>
      *
-     * @param input the input string, may be {@code null}
-     * @return a string representing exactly two Unicode code points,
-     *         left-padded with spaces if necessary
+     * @param text the text to fit, may be {@code null}
+     * @return the fitted text, two columns wide unless its first grapheme cluster is wider
      */
-    private static String firstTwoChars(String input) {
-        if (input == null) {
-            return "  ";
+    static String fitToDayWidth(String text) {
+        String fitted = CharWidth.substringByWidth(text, DAY_WIDTH);
+        if (fitted.isEmpty() && text != null && !text.isEmpty()) {
+            fitted = text.substring(0, GraphemeClusters.clusterEnd(text, 0));
         }
-        int codePointCount = input.codePointCount(0, input.length());
-        if (codePointCount >= 2) {
-            int endIndex = input.offsetByCodePoints(0, 2);
-            return input.substring(0, endIndex);
-        } else if (codePointCount == 1) {
-            return " " + input;
-        } else {
-            return "  ";
+        StringBuilder label = new StringBuilder();
+        for (int width = CharWidth.of(fitted); width < DAY_WIDTH; width++) {
+            label.append(' ');
         }
+        return label.append(fitted).toString();
     }
 
     /**
