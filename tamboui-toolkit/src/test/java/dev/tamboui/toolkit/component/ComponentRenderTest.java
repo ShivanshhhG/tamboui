@@ -37,6 +37,16 @@ class ComponentRenderTest extends AbstractElementTest {
         }
     }
 
+    static class CountingComponent extends Component<CountingComponent> {
+        int renders;
+
+        @Override
+        protected Element render() {
+            renders++;
+            return text("X");
+        }
+    }
+
     @Test
     @DisplayName("A component in a column is given room and renders its content")
     void componentInColumnRenders() {
@@ -71,5 +81,21 @@ class ComponentRenderTest extends AbstractElementTest {
         Size size = new NullComponent().preferredSize(80, 24, context);
 
         assertThat(size).isEqualTo(Size.ZERO);
+    }
+
+    @Test
+    @DisplayName("render() is not re-run for each repeated size query in a layout pass")
+    void renderIsCachedAcrossSizeQueries() {
+        Rect area = new Rect(0, 0, 10, 3);
+        Buffer buffer = Buffer.empty(area);
+        Frame frame = Frame.forTesting(buffer);
+        CountingComponent component = new CountingComponent();
+
+        // A column queries each child's preferred size several times, then draws it
+        column(text("BEFORE"), component.id("c"), text("AFTER"))
+            .render(frame, area, DefaultRenderContext.createEmpty());
+
+        // Without caching this was one render() per size query plus the draw; now it is about one per frame
+        assertThat(component.renders).isLessThanOrEqualTo(2);
     }
 }

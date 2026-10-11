@@ -56,17 +56,23 @@ public abstract class Component<T extends Component<T>> extends StyledElement<T>
      * <p>
      * A component's preferred size is that of the content it {@link #render() renders}, so a component placed in a
      * layout container (such as {@code column}, {@code row} or {@code panel}) is given room and is drawn. A component
-     * whose {@code render()} returns {@code null} prefers {@link Size#ZERO}. {@code render()} is called here and again
-     * when drawing, so it should have no side effects.
+     * whose {@code render()} returns {@code null} prefers {@link Size#ZERO}.
+     * <p>
+     * The rendered content is cached and reused across the repeated size queries of a layout pass, and refreshed when
+     * the component is drawn, so {@code render()} runs about once per frame (as {@code LazyElement} does for
+     * supplier-based elements).
      */
     @Override
     public Size preferredSize(int availableWidth, int availableHeight, RenderContext context) {
-        Element content = render();
-        return content != null ? content.preferredSize(availableWidth, availableHeight, context) : Size.ZERO;
+        if (renderedContent == null) {
+            renderedContent = render();
+        }
+        return renderedContent != null ? renderedContent.preferredSize(availableWidth, availableHeight, context) : Size.ZERO;
     }
 
     private ActionHandler actionHandler;
     private RenderContext currentRenderContext;
+    private Element renderedContent;
 
     @Override
     public boolean isFocusable() {
@@ -109,10 +115,10 @@ public abstract class Component<T extends Component<T>> extends StyledElement<T>
         // Register as focusable
         internalContext.focusManager().registerFocusable(elementId, area);
 
-        // Render the component's content
-        Element content = render();
-        if (content != null) {
-            renderContext.renderChild(content, frame, area);
+        // Render the component's content, refreshing the cache the size queries reuse this frame
+        renderedContent = render();
+        if (renderedContent != null) {
+            renderContext.renderChild(renderedContent, frame, area);
         }
     }
 
