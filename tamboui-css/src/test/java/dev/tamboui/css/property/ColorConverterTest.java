@@ -81,6 +81,20 @@ class ColorConverterTest {
     }
 
     @Test
+    void returnsEmptyForOutOfRangeRgb() {
+        assertThat(converter.convert("rgb(255, 255, 255)")).hasValue(Color.rgb(255, 255, 255));
+        assertThat(converter.convert("rgb(256, 0, 0)")).isEmpty();
+        assertThat(converter.convert("rgb(0, 0, 99999999999)")).isEmpty();
+    }
+
+    @Test
+    void returnsEmptyForOutOfRangeIndexedColor() {
+        assertThat(converter.convert("indexed(255)")).hasValue(Color.indexed(255));
+        assertThat(converter.convert("indexed(256)")).isEmpty();
+        assertThat(converter.convert("indexed(99999999999)")).isEmpty();
+    }
+
+    @Test
     void variableResolutionHappensAtCssLevel() {
         // The core ColorConverter doesn't handle variables - that happens in the CSS layer
         // When a variable is pre-resolved, the value is passed directly

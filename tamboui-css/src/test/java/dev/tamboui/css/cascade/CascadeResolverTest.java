@@ -10,6 +10,9 @@ import org.junit.jupiter.api.Test;
 
 import dev.tamboui.css.Styleable;
 import dev.tamboui.css.engine.StyleEngine;
+import dev.tamboui.style.Color;
+import dev.tamboui.style.PropertyDefinition;
+import dev.tamboui.style.PropertyRegistry;
 import dev.tamboui.style.Style;
 import dev.tamboui.widgets.block.BorderType;
 
@@ -296,6 +299,64 @@ class CascadeResolverTest {
         CssStyleResolver resolved = engine.resolve(element);
 
         assertThat(resolved.borderLeft()).hasValue("*");
+    }
+
+    @Test
+    void outOfRangeValuesAreIgnored() {
+        StyleEngine engine = StyleEngine.create();
+        engine.addStylesheet("Panel { color: rgb(300, 0, 0); width: 150%; height: 99999999999; background: blue; }");
+
+        CssStyleResolver resolved = engine.resolve(createStyleable("Panel", null, Collections.emptySet()));
+
+        assertThat(resolved.foreground()).isEmpty();
+        assertThat(resolved.widthConstraint()).isEmpty();
+        assertThat(resolved.heightConstraint()).isEmpty();
+        assertThat(resolved.background()).hasValue(Color.BLUE);
+    }
+
+    @Test
+    void invalidValueDoesNotOverrideValidValue() {
+        StyleEngine engine = StyleEngine.create();
+        engine.addStylesheet("Panel { color: red; }\n#main { color: bogus; }");
+
+        CssStyleResolver resolved = engine.resolve(createStyleable("Panel", "main", Collections.emptySet()));
+
+        assertThat(resolved.foreground()).hasValue(Color.RED);
+    }
+
+    @Test
+    void undefinedVariableDoesNotOverrideValidValue() {
+        StyleEngine engine = StyleEngine.create();
+        engine.addStylesheet("$accent: green;\nPanel { color: red; }\n#main { color: $acent; }");
+
+        CssStyleResolver resolved = engine.resolve(createStyleable("Panel", "main", Collections.emptySet()));
+
+        assertThat(resolved.foreground()).hasValue(Color.RED);
+    }
+
+    @Test
+    void valueRejectedByThrowingConverterIsIgnored() {
+        PropertyDefinition<Integer> number = PropertyDefinition.of("test-number",
+                value -> Optional.of(Integer.parseInt(value)));
+        PropertyRegistry.register(number);
+        StyleEngine engine = StyleEngine.create();
+        engine.addStylesheet("Panel { test-number: 7; }\n#main { test-number: seven; }");
+
+        CssStyleResolver resolved = engine.resolve(createStyleable("Panel", "main", Collections.emptySet()));
+
+        assertThat(resolved.get(number)).hasValue(7);
+    }
+
+    @Test
+    void unregisteredPropertyValueRejectedByThrowingConverterIsIgnored() {
+        PropertyDefinition<Integer> number = PropertyDefinition.of("test-unregistered-number",
+                value -> Optional.of(Integer.parseInt(value)));
+        StyleEngine engine = StyleEngine.create();
+        engine.addStylesheet("Panel { test-unregistered-number: seven; }");
+
+        CssStyleResolver resolved = engine.resolve(createStyleable("Panel", null, Collections.emptySet()));
+
+        assertThat(resolved.get(number)).isEmpty();
     }
 
     @Test

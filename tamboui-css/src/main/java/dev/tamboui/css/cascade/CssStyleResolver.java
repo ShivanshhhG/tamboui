@@ -89,7 +89,7 @@ public final class CssStyleResolver implements StylePropertyResolver {
      *
      * @param property the property definition
      * @param <T>      the type of the property value
-     * @return the property value, or empty if not found
+     * @return the property value, or empty if not found or if the raw value cannot be converted
      */
     @Override
     public <T> Optional<T> get(PropertyDefinition<T> property) {
@@ -102,7 +102,7 @@ public final class CssStyleResolver implements StylePropertyResolver {
         // Fall back to lazy conversion from raw values
         String rawValue = rawValues.get(property.name());
         if (rawValue != null) {
-            return property.convert(rawValue);
+            return CascadeResolver.convert(property, rawValue);
         }
 
         return Optional.empty();

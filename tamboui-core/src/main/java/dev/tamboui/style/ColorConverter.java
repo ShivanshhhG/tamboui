@@ -17,9 +17,11 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>Named colors: red, green, blue, etc.</li>
  *   <li>Hex colors: #RGB, #RRGGBB</li>
- *   <li>RGB function: rgb(r, g, b)</li>
+ *   <li>RGB function: rgb(r, g, b), each component 0-255</li>
  *   <li>Indexed colors: indexed(0-255)</li>
  * </ul>
+ * <p>
+ * A value outside these ranges converts to empty, like any other value that is not a color.
  * <p>
  * Example usage:
  * <pre>{@code
@@ -104,22 +106,40 @@ public final class ColorConverter implements PropertyConverter<Color> {
         // RGB function
         Matcher rgbMatcher = RGB_PATTERN.matcher(normalized);
         if (rgbMatcher.matches()) {
-            int r = Integer.parseInt(rgbMatcher.group(1));
-            int g = Integer.parseInt(rgbMatcher.group(2));
-            int b = Integer.parseInt(rgbMatcher.group(3));
+            int r = parseComponent(rgbMatcher.group(1));
+            int g = parseComponent(rgbMatcher.group(2));
+            int b = parseComponent(rgbMatcher.group(3));
+            if (r < 0 || g < 0 || b < 0) {
+                return Optional.empty();
+            }
             return Optional.of(Color.rgb(r, g, b));
         }
 
         // Indexed color
         Matcher indexedMatcher = INDEXED_PATTERN.matcher(normalized);
         if (indexedMatcher.matches()) {
-            int index = Integer.parseInt(indexedMatcher.group(1));
-            if (index >= 0 && index <= 255) {
+            int index = parseComponent(indexedMatcher.group(1));
+            if (index >= 0) {
                 return Optional.of(Color.indexed(index));
             }
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Parses an RGB component or a color index, both of which must be in 0-255.
+     *
+     * @param digits the decimal digits matched by the pattern
+     * @return the value, or -1 if it is greater than 255
+     */
+    private static int parseComponent(String digits) {
+        try {
+            int value = Integer.parseInt(digits);
+            return value <= 255 ? value : -1;
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     private Color parseHex(String hex) {

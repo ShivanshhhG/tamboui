@@ -63,6 +63,17 @@ class MarkupParserTest {
     }
 
     @Test
+    @DisplayName("out-of-range rgb and indexed color tokens are ignored")
+    void outOfRangeColorTokensAreIgnored() {
+        Text text = MarkupParser.parse("[rgb(300,0,0)]hi[/] [indexed(99999999999)]there[/]");
+
+        assertThat(text.rawContent()).isEqualTo("hi there");
+        for (Span span : text.lines().get(0).spans()) {
+            assertThat(span.style().fg()).isEmpty();
+        }
+    }
+
+    @Test
     @DisplayName("parse plain text without markup")
     void parsePlainText() {
         Text text = MarkupParser.parse("Hello World");

@@ -14,6 +14,7 @@ import dev.tamboui.css.model.Rule;
 import dev.tamboui.css.property.PropertyConverter;
 import dev.tamboui.style.PropertyDefinition;
 import dev.tamboui.style.PropertyRegistry;
+import dev.tamboui.style.StandardProperties;
 
 /**
  * Resolves CSS cascade and specificity to produce final computed styles.
@@ -24,7 +25,8 @@ import dev.tamboui.style.PropertyRegistry;
  *   <li>Sort by specificity (higher wins)</li>
  *   <li>For equal specificity, later rules win (source order)</li>
  *   <li>!important declarations override all non-important</li>
- *   <li>Merge all matching declarations into a final style</li>
+ *   <li>Merge all matching declarations into a final style, ignoring those
+ *       whose value cannot be converted, as in CSS</li>
  * </ol>
  * <p>
  * Unknown properties (those not registered in {@link PropertyRegistry}) are handled
@@ -93,6 +95,11 @@ public final class CascadeResolver {
                 String prop = entry.getKey();
                 PropertyValue value = entry.getValue();
 
+                // As in CSS, an invalid value is ignored, so it cannot override a valid one
+                if (hasInvalidValue(prop, value, variables)) {
+                    continue;
+                }
+
                 if (value.important()) {
                     importantProps.put(prop, value);
                 } else {
@@ -127,7 +134,7 @@ public final class CascadeResolver {
             String resolvedValue = PropertyConverter.resolveVariables(value, variables);
 
             // Try to look up the property in the registry
-            Optional<PropertyDefinition<?>> propDef = PropertyRegistry.byName(prop);
+            Optional<PropertyDefinition<?>> propDef = findProperty(prop);
 
             if (propDef.isPresent()) {
                 // Handle known properties through the registry
@@ -148,8 +155,54 @@ public final class CascadeResolver {
     private <T> void convertAndSet(CssStyleResolver.Builder builder,
                                    PropertyDefinition<T> property,
                                    String resolvedValue) {
-        Optional<T> converted = property.convert(resolvedValue);
+        Optional<T> converted = convert(property, resolvedValue);
         converted.ifPresent(v -> builder.set(property, v));
+    }
+
+    /**
+     * Returns whether a declaration sets a known property to a value that cannot
+     * be converted. Unknown properties are not checked: they are kept as raw values
+     * for the widget that defines them.
+     */
+    private static boolean hasInvalidValue(String prop, PropertyValue value, Map<String, String> variables) {
+        if (value.isInherit()) {
+            return false;
+        }
+        Optional<PropertyDefinition<?>> propDef = findProperty(prop);
+        if (!propDef.isPresent()) {
+            return false;
+        }
+        String resolvedValue = PropertyConverter.resolveVariables(value.raw(), variables);
+        return !convert(propDef.get(), resolvedValue).isPresent();
+    }
+
+    /**
+     * Looks up a property definition by name. The standard properties are checked
+     * as well, because they are only added to the registry once
+     * {@link StandardProperties} has been used, which can be after the first cascade.
+     */
+    private static Optional<PropertyDefinition<?>> findProperty(String prop) {
+        Optional<PropertyDefinition<?>> registered = PropertyRegistry.byName(prop);
+        return registered.isPresent() ? registered : StandardProperties.byName(prop);
+    }
+
+    /**
+     * Converts a CSS value with the property's converter. A converter that throws
+     * is treated like one that returns empty, so an invalid value is ignored
+     * instead of failing the rendering.
+     *
+     * @param property the property definition
+     * @param value    the CSS value, with variables resolved
+     * @param <T>      the type of the property value
+     * @return the converted value, or empty if the value is invalid
+     */
+    static <T> Optional<T> convert(PropertyDefinition<T> property, String value) {
+        try {
+            return property.convert(value);
+        } catch (RuntimeException e) {
+            LOGGER.log(Level.FINE, e, () -> "Ignoring invalid value of CSS property " + property.name() + ": " + value);
+            return Optional.empty();
+        }
     }
 
     /**

@@ -24,6 +24,9 @@ import dev.tamboui.style.PropertyConverter;
  *   <li>{@code max(20)} - Maximum 20 cells</li>
  *   <li>{@code 1/3} - Ratio (1 part of 3)</li>
  * </ul>
+ * <p>
+ * A value out of range, such as {@code 150%}, {@code 1/0} or a number too large
+ * for an {@code int}, converts to empty.
  */
 public final class ConstraintConverter implements PropertyConverter<Constraint> {
 
@@ -49,8 +52,15 @@ public final class ConstraintConverter implements PropertyConverter<Constraint> 
             return Optional.empty();
         }
 
-        String normalized = value.trim().toLowerCase();
+        try {
+            return parse(value.trim().toLowerCase());
+        } catch (NumberFormatException e) {
+            // A number too large for an int
+            return Optional.empty();
+        }
+    }
 
+    private static Optional<Constraint> parse(String normalized) {
         // Try "fit" keyword
         if ("fit".equals(normalized)) {
             return Optional.of(Constraint.fit());
@@ -77,6 +87,9 @@ public final class ConstraintConverter implements PropertyConverter<Constraint> 
         Matcher percentMatcher = PERCENT_PATTERN.matcher(normalized);
         if (percentMatcher.matches()) {
             int percent = Integer.parseInt(percentMatcher.group(1));
+            if (percent > 100) {
+                return Optional.empty();
+            }
             return Optional.of(Constraint.percentage(percent));
         }
 
@@ -99,6 +112,9 @@ public final class ConstraintConverter implements PropertyConverter<Constraint> 
         if (ratioMatcher.matches()) {
             int numerator = Integer.parseInt(ratioMatcher.group(1));
             int denominator = Integer.parseInt(ratioMatcher.group(2));
+            if (denominator == 0) {
+                return Optional.empty();
+            }
             return Optional.of(Constraint.ratio(numerator, denominator));
         }
 
