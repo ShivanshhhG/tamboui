@@ -289,14 +289,14 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <section class="detail" id="create()">
 <h3>create</h3>
 <div class="horizontal-scroll">
-<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span>()
-                                  throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span>()</div>
 <div class="block">Creates an InlineToolkitRunner with an initial height of 1.</div>
 <dl class="notes">
 <dt>Returns:</dt>
 <dd>a new InlineToolkitRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../../terminal/BackendException.html" title="class in dev.tamboui.terminal">BackendException</a></code> - if no backend is available</dd>
 </dl>
 </div>
 </section>
@@ -305,8 +305,7 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <section class="detail" id="create(int)">
 <h3>create</h3>
 <div class="horizontal-scroll">
-<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(int&nbsp;height)</span>
-                                  throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(int&nbsp;height)</span></div>
 <div class="block">Creates an InlineToolkitRunner with the specified height.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
@@ -314,7 +313,8 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <dt>Returns:</dt>
 <dd>a new InlineToolkitRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../../terminal/BackendException.html" title="class in dev.tamboui.terminal">BackendException</a></code> - if no backend is available</dd>
 </dl>
 </div>
 </section>
@@ -323,8 +323,7 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <section class="detail" id="create(dev.tamboui.tui.InlineTuiConfig)">
 <h3>create</h3>
 <div class="horizontal-scroll">
-<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(<a href="../../tui/InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span>
-                                  throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(<a href="../../tui/InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span></div>
 <div class="block">Creates an InlineToolkitRunner with the specified configuration.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
@@ -332,7 +331,8 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <dt>Returns:</dt>
 <dd>a new InlineToolkitRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../../terminal/BackendException.html" title="class in dev.tamboui.terminal">BackendException</a></code> - if no backend is available</dd>
 </dl>
 </div>
 </section>
@@ -342,8 +342,7 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <h3>create</h3>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineToolkitRunner.html" title="class in dev.tamboui.toolkit.app">InlineToolkitRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(<a href="../../terminal/Backend.html" title="interface in dev.tamboui.terminal">Backend</a>&nbsp;backend,
- <a href="../../tui/InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span>
-                                  throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+ <a href="../../tui/InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span></div>
 <div class="block">Creates an InlineToolkitRunner on the given backend, for embedding or testing.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
@@ -352,7 +351,7 @@ try (var runner = InlineToolkitRunner.create(4)) {
 <dt>Returns:</dt>
 <dd>a new InlineToolkitRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if initialization fails</dd>
+<dd><code><a href="../../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if initialization fails</dd>
 </dl>
 </div>
 </section>

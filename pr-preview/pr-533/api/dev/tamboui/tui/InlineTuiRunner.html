@@ -266,8 +266,7 @@ with the event handling capabilities of <a href="TuiRunner.html" title="class in
 <section class="detail" id="create(int)">
 <h3>create</h3>
 <div class="horizontal-scroll">
-<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineTuiRunner.html" title="class in dev.tamboui.tui">InlineTuiRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(int&nbsp;height)</span>
-                              throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineTuiRunner.html" title="class in dev.tamboui.tui">InlineTuiRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(int&nbsp;height)</span></div>
 <div class="block">Creates an InlineTuiRunner with the specified height and default configuration.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
@@ -275,7 +274,8 @@ with the event handling capabilities of <a href="TuiRunner.html" title="class in
 <dt>Returns:</dt>
 <dd>a new InlineTuiRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../terminal/BackendException.html" title="class in dev.tamboui.terminal">BackendException</a></code> - if no backend is available</dd>
 </dl>
 </div>
 </section>
@@ -284,8 +284,7 @@ with the event handling capabilities of <a href="TuiRunner.html" title="class in
 <section class="detail" id="create(dev.tamboui.tui.InlineTuiConfig)">
 <h3>create</h3>
 <div class="horizontal-scroll">
-<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineTuiRunner.html" title="class in dev.tamboui.tui">InlineTuiRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(<a href="InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span>
-                              throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+<div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineTuiRunner.html" title="class in dev.tamboui.tui">InlineTuiRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(<a href="InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span></div>
 <div class="block">Creates an InlineTuiRunner with the specified configuration.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
@@ -293,7 +292,8 @@ with the event handling capabilities of <a href="TuiRunner.html" title="class in
 <dt>Returns:</dt>
 <dd>a new InlineTuiRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if terminal initialization fails</dd>
+<dd><code><a href="../terminal/BackendException.html" title="class in dev.tamboui.terminal">BackendException</a></code> - if no backend is available</dd>
 </dl>
 </div>
 </section>
@@ -303,8 +303,7 @@ with the event handling capabilities of <a href="TuiRunner.html" title="class in
 <h3>create</h3>
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">public static</span>&nbsp;<span class="return-type"><a href="InlineTuiRunner.html" title="class in dev.tamboui.tui">InlineTuiRunner</a></span>&nbsp;<span class="element-name">create</span><wbr><span class="parameters">(<a href="../terminal/Backend.html" title="interface in dev.tamboui.terminal">Backend</a>&nbsp;backend,
- <a href="InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span>
-                              throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></span></div>
+ <a href="InlineTuiConfig.html" title="class in dev.tamboui.tui">InlineTuiConfig</a>&nbsp;config)</span></div>
 <div class="block">Creates an InlineTuiRunner on the given backend, for embedding or testing.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
@@ -313,7 +312,7 @@ with the event handling capabilities of <a href="TuiRunner.html" title="class in
 <dt>Returns:</dt>
 <dd>a new InlineTuiRunner</dd>
 <dt>Throws:</dt>
-<dd><code><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/Exception.html" title="class or interface in java.lang" class="external-link">Exception</a></code> - if initialization fails</dd>
+<dd><code><a href="../error/RuntimeIOException.html" title="class in dev.tamboui.error">RuntimeIOException</a></code> - if initialization fails</dd>
 </dl>
 </div>
 </section>
