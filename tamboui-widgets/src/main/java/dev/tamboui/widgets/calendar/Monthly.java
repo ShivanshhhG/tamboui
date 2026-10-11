@@ -11,7 +11,9 @@ import java.time.format.TextStyle;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
@@ -42,9 +44,11 @@ import dev.tamboui.widgets.block.Block;
  */
 public final class Monthly implements Widget {
 
-    private static final int DAY_WIDTH = 2;  // Width of a day number, and of a weekday label
-    private static final int CELL_WIDTH = 3;  // Width per day cell (2 digits + space)
-    private static final int CALENDAR_WIDTH = CELL_WIDTH * 7 - 1;  // 7 days, minus trailing space
+    private static final int MIN_DAY_WIDTH = 2;  // A day number is at most two digits, so a cell is at least this wide
+
+    // Weekday labels depend only on the locale, so they are computed once per locale and shared across all
+    // calendars and renders (a calendar is often rebuilt every frame, so a per-instance cache would not help)
+    private static final Map<Locale, String[]> WEEKDAY_LABEL_CACHE = new ConcurrentHashMap<>();
 
     private final LocalDate displayDate;
     private final DateStyler dateStyler;
@@ -56,6 +60,8 @@ public final class Monthly implements Widget {
     private final DayOfWeek firstDayOfWeek;
     private final Locale locale;
 
+    // Weekday labels and the day cell width derived from them depend only on the final locale, so they are
+    // computed once and reused across renders
     private Monthly(Builder builder) {
         this.displayDate = builder.displayDate;
         this.dateStyler = builder.dateStyler;
@@ -221,13 +227,19 @@ public final class Monthly implements Widget {
             y = renderMonthHeader(buffer, calendarArea, y);
         }
 
+        // The day cell is as wide as the widest weekday label (three columns for some scripts, such as
+        // Burmese or Tibetan), but at least two columns for the day numbers. Every column uses this width,
+        // so the weekday header lines up with the days below it.
+        String[] labels = weekdaysHeaderStyle != null ? weekdayLabels(locale) : null;
+        int dayWidth = labels != null ? dayWidth(labels) : MIN_DAY_WIDTH;
+
         // Render weekdays header
-        if (weekdaysHeaderStyle != null) {
-            y = renderWeekdaysHeader(buffer, calendarArea, y);
+        if (labels != null) {
+            y = renderWeekdaysHeader(buffer, calendarArea, y, labels, dayWidth);
         }
 
         // Render calendar grid
-        renderCalendarGrid(buffer, calendarArea, y);
+        renderCalendarGrid(buffer, calendarArea, y, dayWidth);
     }
 
     private int renderMonthHeader(Buffer buffer, Rect area, int y) {
@@ -246,12 +258,10 @@ public final class Monthly implements Widget {
         return y + 1;
     }
 
-    private int renderWeekdaysHeader(Buffer buffer, Rect area, int y) {
+    private int renderWeekdaysHeader(Buffer buffer, Rect area, int y, String[] weekdayLabels, int dayWidth) {
         if (y >= area.bottom()) {
             return y;
         }
-
-        String[] weekdayLabels = weekdayLabels(locale);
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 7; i++) {
@@ -259,7 +269,7 @@ public final class Monthly implements Widget {
             if (i > 0) {
                 sb.append(" ");
             }
-            sb.append(weekdayLabels[dayIndex]);
+            sb.append(leftPad(weekdayLabels[dayIndex], dayWidth));
         }
 
         String header = sb.toString();
@@ -269,7 +279,7 @@ public final class Monthly implements Widget {
         return y + 1;
     }
 
-    private void renderCalendarGrid(Buffer buffer, Rect area, int startY) {
+    private void renderCalendarGrid(Buffer buffer, Rect area, int startY, int dayWidth) {
         YearMonth yearMonth = YearMonth.from(displayDate);
         LocalDate firstOfMonth = yearMonth.atDay(1);
         LocalDate lastOfMonth = yearMonth.atEndOfMonth();
@@ -294,7 +304,7 @@ public final class Monthly implements Widget {
                     line.append(" ");
                 }
 
-                String dayStr = String.format("%2d", currentDate.getDayOfMonth());
+                String dayStr = String.format("%" + dayWidth + "d", currentDate.getDayOfMonth());
                 line.append(dayStr);
 
                 // Determine style for this day
@@ -305,8 +315,8 @@ public final class Monthly implements Widget {
                         style = surroundingStyle;
                     } else {
                         // Don't show surrounding days if not configured
-                        line.setLength(line.length() - 2);
-                        line.append("  ");
+                        line.setLength(line.length() - dayWidth);
+                        line.append(leftPad("", dayWidth));
                         styles[day] = null;
                         currentDate = currentDate.plusDays(1);
                         continue;
@@ -337,10 +347,10 @@ public final class Monthly implements Widget {
                 }
 
                 if (styles[day] != null) {
-                    String dayStr = line.substring(charPos, charPos + 2);
+                    String dayStr = line.substring(charPos, charPos + dayWidth);
                     buffer.setString(x + charPos, y, dayStr, styles[day]);
                 }
-                charPos += 2;
+                charPos += dayWidth;
             }
 
             y++;
@@ -379,6 +389,10 @@ public final class Monthly implements Widget {
      * @see DayOfWeek#getDisplayName(TextStyle, Locale)
      */
     private static String[] weekdayLabels(Locale locale) {
+        return WEEKDAY_LABEL_CACHE.computeIfAbsent(locale, Monthly::computeWeekdayLabels);
+    }
+
+    private static String[] computeWeekdayLabels(Locale locale) {
         String[] labels = weekdayLabels(locale, TextStyle.SHORT_STANDALONE);
         if (!allDistinct(labels)) {
             String[] narrowLabels = weekdayLabels(locale, TextStyle.NARROW_STANDALONE);
@@ -422,15 +436,44 @@ public final class Monthly implements Widget {
      * @return the fitted text, two columns wide unless its first grapheme cluster is wider
      */
     static String fitToDayWidth(String text) {
-        String fitted = CharWidth.substringByWidth(text, DAY_WIDTH);
+        String fitted = CharWidth.substringByWidth(text, MIN_DAY_WIDTH);
         if (fitted.isEmpty() && text != null && !text.isEmpty()) {
             fitted = text.substring(0, GraphemeClusters.clusterEnd(text, 0));
         }
-        StringBuilder label = new StringBuilder();
-        for (int width = CharWidth.of(fitted); width < DAY_WIDTH; width++) {
-            label.append(' ');
+        return leftPad(fitted, MIN_DAY_WIDTH);
+    }
+
+    /**
+     * Returns the width of a day cell: the width of the widest weekday label, but at least
+     * {@link #MIN_DAY_WIDTH} for the day numbers. A script whose shortest weekday name is three
+     * columns wide (such as Burmese or Tibetan) gives three-column cells, so the header stays aligned.
+     *
+     * @param labels the fitted weekday labels
+     * @return the day cell width in columns
+     */
+    private static int dayWidth(String[] labels) {
+        int width = MIN_DAY_WIDTH;
+        for (String label : labels) {
+            width = Math.max(width, CharWidth.of(label));
         }
-        return label.append(fitted).toString();
+        return width;
+    }
+
+
+    /**
+     * Left-pads the text with spaces to the given display width. Text already at least that wide is
+     * returned unchanged.
+     *
+     * @param text  the text to pad
+     * @param width the target display width in columns
+     * @return the left-padded text
+     */
+    private static String leftPad(String text, int width) {
+        StringBuilder sb = new StringBuilder();
+        for (int w = CharWidth.of(text); w < width; w++) {
+            sb.append(' ');
+        }
+        return sb.append(text).toString();
     }
 
     /**
