@@ -51,9 +51,18 @@ public abstract class Component<T extends Component<T>> extends StyledElement<T>
     protected Component() {
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>
+     * A component's preferred size is that of the content it {@link #render() renders}, so a component placed in a
+     * layout container (such as {@code column}, {@code row} or {@code panel}) is given room and is drawn. A component
+     * whose {@code render()} returns {@code null} prefers {@link Size#ZERO}. {@code render()} is called here and again
+     * when drawing, so it should have no side effects.
+     */
     @Override
     public Size preferredSize(int availableWidth, int availableHeight, RenderContext context) {
-        return Size.ZERO;
+        Element content = render();
+        return content != null ? content.preferredSize(availableWidth, availableHeight, context) : Size.ZERO;
     }
 
     private ActionHandler actionHandler;
