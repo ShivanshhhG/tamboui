@@ -253,9 +253,9 @@ variation sequence (see <code>EMOJI_VARIATION_BASES</code>).</div>
 <div class="block">Returns a substring that fits within the given display width,
 respecting code point and grapheme cluster boundaries.
 <p>
-If a wide character would exceed maxWidth, it is not included.
-ZWJ sequences are kept intact - truncation happens at the last
-safe break point before the ZWJ sequence if it wouldn't fit.</div>
+If a grapheme cluster would exceed maxWidth, it is not included.
+ZWJ sequences, flag pairs, variation selectors and combining marks are
+kept together.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
 <dd><code>s</code> - the source string</dd>

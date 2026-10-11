@@ -107,6 +107,9 @@ if (event.isKey(KeyCode.F1)) { }</code></pre>
 With vim bindings, <code>isUp()</code> matches Up arrow, <code>k</code>, or <code>Ctrl+p</code>.
 With standard bindings, it only matches the Up arrow.</p>
 </div>
+<div class="paragraph">
+<p>For applications calling <code>EventParser.readEvent(&#8230;&#8203;)</code> directly, a read timeout returns <code>null</code>, while terminal EOF throws the JDK&#8217;s <code>EOFException</code> (a subclass of <code>IOException</code>). Once a bracketed paste starts, its content is read until the end marker even across read timeouts; a partial paste is never emitted just because input pauses. EOF during a paste discards its content. If an end marker never arrives, input waits in paste mode until EOF or application shutdown rather than interpreting a late pasted Enter as a key. Paste content is buffered as a single string with no fixed size limit, so memory use grows with the paste until it completes. <code>TuiRunner</code> and <code>InlineTuiRunner</code> stop their input reader on EOF.</p>
+</div>
 </div>
 </div>
 <div class="sect1">
