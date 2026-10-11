@@ -297,7 +297,7 @@ cursor visibility, raw mode).</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>int</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#peek(int)" class="member-name-link">peek</a><wbr>(int&nbsp;timeoutMs)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Peeks at the next character without consuming it.</div>
+<div class="block">Returns the next code point without consuming it, waiting up to <code>timeoutMs</code> for it.</div>
 </div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>int</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#read(int)" class="member-name-link">read</a><wbr>(int&nbsp;timeoutMs)</code></div>
@@ -905,8 +905,11 @@ This is a convenience method for protocols that work with ASCII escape sequences
 <div class="horizontal-scroll">
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">int</span>&nbsp;<span class="element-name">peek</span><wbr><span class="parameters">(int&nbsp;timeoutMs)</span>
          throws <span class="exceptions"><a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/io/IOException.html" title="class or interface in java.io" class="external-link">IOException</a></span></div>
-<div class="block"><span class="description-from-type-label">Description copied from interface:&nbsp;<code><a href="../../terminal/Backend.html#peek(int)">Backend</a></code></span></div>
-<div class="block">Peeks at the next character without consuming it.</div>
+<div class="block">Returns the next code point without consuming it, waiting up to <code>timeoutMs</code> for it.
+<p>
+Input arrives in chunks from the connection, and an escape sequence can be split between
+two of them (over SSH or HTTP), so the parser's peek after <code>ESC</code> has to wait for the
+rest instead of reporting a lone Escape.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
 <dd><code>timeoutMs</code> - timeout in milliseconds</dd>
