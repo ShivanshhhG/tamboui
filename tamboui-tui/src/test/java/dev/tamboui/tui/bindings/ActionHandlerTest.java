@@ -15,6 +15,7 @@ import dev.tamboui.tui.event.Event;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
+import dev.tamboui.tui.event.MouseEvent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -97,6 +98,59 @@ class ActionHandlerTest {
         boolean handled = handler.dispatch(upEvent);
 
         assertThat(handled).isFalse();
+    }
+
+    @Test
+    void dispatchFiresConfirmOnEnter() {
+        // With the standard bindings Enter is both "select" and "confirm"
+        List<Event> received = new ArrayList<>();
+        handler.on(Actions.CONFIRM, e -> received.add(e));
+
+        boolean handled = handler.dispatch(KeyEvent.ofKey(KeyCode.ENTER, bindings));
+
+        assertThat(handled).isTrue();
+        assertThat(received).hasSize(1);
+    }
+
+    @Test
+    void dispatchFiresScrollUpOnWheelUp() {
+        // The wheel is both "scroll" and "scrollUp"
+        List<Event> received = new ArrayList<>();
+        handler.on(Actions.SCROLL_UP, e -> received.add(e));
+
+        boolean handled = handler.dispatch(MouseEvent.scrollUp(0, 0));
+
+        assertThat(handled).isTrue();
+        assertThat(received).hasSize(1);
+    }
+
+    @Test
+    void dispatchFiresCustomActionBoundToAKeyThatIsAlreadyBound() {
+        Bindings custom = bindings.toBuilder()
+                .bind(KeyTrigger.key(KeyCode.ENTER), "submit")
+                .build();
+        ActionHandler customHandler = new ActionHandler(custom);
+        List<Event> received = new ArrayList<>();
+        customHandler.on("submit", e -> received.add(e));
+
+        boolean handled = customHandler.dispatch(KeyEvent.ofKey(KeyCode.ENTER, custom));
+
+        assertThat(handled).isTrue();
+        assertThat(received).hasSize(1);
+    }
+
+    @Test
+    void dispatchFiresOneActionWhenSeveralMatchingActionsHaveHandlers() {
+        // Shift+Tab matches "focusPrevious" and also "focusNext", whose Tab trigger does not check
+        // Shift. Firing both would move the focus forward and straight back.
+        List<String> fired = new ArrayList<>();
+        handler.on(Actions.FOCUS_NEXT, e -> fired.add(Actions.FOCUS_NEXT));
+        handler.on(Actions.FOCUS_PREVIOUS, e -> fired.add(Actions.FOCUS_PREVIOUS));
+
+        boolean handled = handler.dispatch(KeyEvent.ofKey(KeyCode.TAB, KeyModifiers.SHIFT, bindings));
+
+        assertThat(handled).isTrue();
+        assertThat(fired).hasSize(1);
     }
 
     @Test

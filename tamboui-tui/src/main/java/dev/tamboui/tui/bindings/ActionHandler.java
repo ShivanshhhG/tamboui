@@ -37,7 +37,8 @@ import dev.tamboui.tui.event.Event;
 public final class ActionHandler {
 
     private Bindings bindings;
-    private final Map<String, List<BiConsumer<Event, String>>> handlers = new HashMap<>();
+    // Linked, so dispatch tries the other actions an event matches in a stable order
+    private final Map<String, List<BiConsumer<Event, String>>> handlers = new LinkedHashMap<>();
 
     /**
      * Creates a new action handler with the given bindings.
@@ -162,17 +163,28 @@ public final class ActionHandler {
     /**
      * Dispatches an event to registered handlers.
      * <p>
-     * The event is matched against the bindings. If a matching action is found
-     * and handlers are registered for that action, all handlers are invoked
-     * in registration order.
+     * The event is matched against the bindings, and the handlers of one matching action are
+     * invoked in registration order. An event can match several actions (with the standard
+     * bindings Enter is both {@link Actions#SELECT} and {@link Actions#CONFIRM}), so the action
+     * fired is the first one that has handlers: the action the bindings resolve the event to
+     * ({@link Bindings#actionFor}), otherwise the other matching actions in the order their
+     * handlers were first registered.
      *
      * @param event the event to dispatch
-     * @return true if the event was handled (action found with registered handlers),
+     * @return true if the event was handled (a matching action with registered handlers),
      *         false otherwise
      */
     public boolean dispatch(Event event) {
-        Optional<String> action = bindings.actionFor(event);
-        return action.isPresent() && fire(action.get(), event);
+        Optional<String> resolved = bindings.actionFor(event);
+        if (resolved.isPresent() && fire(resolved.get(), event)) {
+            return true;
+        }
+        for (String action : handlers.keySet()) {
+            if (!action.equals(resolved.orElse(null)) && bindings.matches(event, action)) {
+                return fire(action, event);
+            }
+        }
+        return false;
     }
 
     /**
