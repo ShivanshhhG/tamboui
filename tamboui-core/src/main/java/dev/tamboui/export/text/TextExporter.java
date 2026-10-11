@@ -4,6 +4,8 @@
  */
 package dev.tamboui.export.text;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Objects;
 
 import dev.tamboui.buffer.Buffer;
@@ -39,13 +41,14 @@ public final class TextExporter {
      * @param region  the rectangle to export (empty produces empty string)
      * @param options export options
      * @param out     where to append the text
+     * @throws UncheckedIOException if appending to {@code out} fails
      */
     static void encode(Buffer buffer, Rect region, TextOptions options, Appendable out) {
         String text = buildText(buffer, region, options);
         try {
             out.append(text);
-        } catch (java.io.IOException e) {
-            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write the text export: " + e.getMessage(), e);
         }
     }
 

@@ -4,6 +4,8 @@
  */
 package dev.tamboui.export.html;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -46,13 +48,14 @@ public final class HtmlExporter {
      * @param region  the rectangle to export (empty produces minimal HTML)
      * @param options export options
      * @param out     where to append the HTML
+     * @throws UncheckedIOException if appending to {@code out} fails
      */
     static void encode(Buffer buffer, Rect region, HtmlOptions options, Appendable out) {
         String html = buildHtml(buffer, region, options);
         try {
             out.append(html);
-        } catch (java.io.IOException e) {
-            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write the HTML export: " + e.getMessage(), e);
         }
     }
 

@@ -4,6 +4,8 @@
  */
 package dev.tamboui.export.svg;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -49,13 +51,14 @@ public final class SvgExporter {
      * @param region  the rectangle to export (empty produces minimal SVG)
      * @param options export options
      * @param out     where to append the SVG
+     * @throws UncheckedIOException if appending to {@code out} fails
      */
     static void encode(Buffer buffer, Rect region, SvgOptions options, Appendable out) {
         String svg = buildSvg(buffer, region, options);
         try {
             out.append(svg);
-        } catch (java.io.IOException e) {
-            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write the SVG export: " + e.getMessage(), e);
         }
     }
 

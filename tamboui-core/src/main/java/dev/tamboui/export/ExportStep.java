@@ -7,6 +7,7 @@ package dev.tamboui.export;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -57,7 +58,7 @@ public final class ExportStep<O extends ExportOptions> {
     public void toFile(Path path) throws IOException {
         Objects.requireNonNull(path, "path");
         try (Writer writer = new OutputStreamWriter(Files.newOutputStream(path), UTF_8)) {
-            format.encoder().encode(request.buffer(), request.region(), options, writer);
+            encodeTo(writer);
         }
     }
 
@@ -81,8 +82,23 @@ public final class ExportStep<O extends ExportOptions> {
      */
     public void to(Writer out) throws IOException {
         Objects.requireNonNull(out, "out");
-        format.encoder().encode(request.buffer(), request.region(), options, out);
+        encodeTo(out);
         out.flush();
+    }
+
+    /**
+     * Encodes to the given output and rethrows the {@link IOException} that the encoder wrapped
+     * in an {@link UncheckedIOException} (see {@link Encoder#encode}).
+     *
+     * @param out where to append the encoded output
+     * @throws IOException if writing to {@code out} fails
+     */
+    private void encodeTo(Appendable out) throws IOException {
+        try {
+            format.encoder().encode(request.buffer(), request.region(), options, out);
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
     }
 
     /**

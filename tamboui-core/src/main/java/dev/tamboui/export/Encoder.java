@@ -4,6 +4,8 @@
  */
 package dev.tamboui.export;
 
+import java.io.UncheckedIOException;
+
 import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 
@@ -17,11 +19,16 @@ public interface Encoder<O extends ExportOptions> {
     /**
      * Encodes the given region of the buffer with the given options and appends the result to the output.
      * When {@code region} is empty, implementations should produce minimal or empty output.
+     * <p>
+     * Implementations report an {@link java.io.IOException} from {@code out} by throwing it
+     * wrapped in an {@link UncheckedIOException}; {@link ExportStep#toFile(java.nio.file.Path)}
+     * and the {@code ExportStep.to} methods unwrap it, so their callers get the {@code IOException}.
      *
      * @param buffer the buffer to export from
      * @param region the rectangle to export (already clipped to buffer bounds)
      * @param options format-specific options
      * @param out     where to append the encoded output
+     * @throws UncheckedIOException if appending to {@code out} fails
      */
     void encode(Buffer buffer, Rect region, O options, Appendable out);
 }
