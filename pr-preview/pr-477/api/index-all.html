@@ -3295,6 +3295,14 @@ the ANSI reset sequence (<a href="dev/tamboui/terminal/AnsiStringBuilder.html#RE
 <dd>
 <div class="block">Creates a closing parenthesis token.</div>
 </dd>
+<dt><a href="dev/tamboui/text/GraphemeClusters.html#clusterEnd(java.lang.CharSequence,int)" class="member-name-link">clusterEnd(CharSequence, int)</a> - Static method in class dev.tamboui.text.<a href="dev/tamboui/text/GraphemeClusters.html" title="class in dev.tamboui.text">GraphemeClusters</a></dt>
+<dd>
+<div class="block">Returns the UTF-16 offset past the end of the grapheme cluster starting at <code>pos</code>.</div>
+</dd>
+<dt><a href="dev/tamboui/text/GraphemeClusters.html#clusterStart(java.lang.CharSequence,int)" class="member-name-link">clusterStart(CharSequence, int)</a> - Static method in class dev.tamboui.text.<a href="dev/tamboui/text/GraphemeClusters.html" title="class in dev.tamboui.text">GraphemeClusters</a></dt>
+<dd>
+<div class="block">Returns the UTF-16 offset of the start of the grapheme cluster ending at <code>pos</code>.</div>
+</dd>
 <dt><a href="dev/tamboui/tfx/Fx.html#coalesce(long,dev.tamboui.tfx.Interpolation)" class="member-name-link">coalesce(long, Interpolation)</a> - Static method in class dev.tamboui.tfx.<a href="dev/tamboui/tfx/Fx.html" title="class in dev.tamboui.tfx">Fx</a></dt>
 <dd>
 <div class="block">Creates a coalesce effect (reverse dissolve) that coalesces text from random positions.</div>
@@ -7877,6 +7885,10 @@ same spirit as a highlight.js grammar.</div>
 <div class="block">A single tokenizing rule: a <a href="dev/tamboui/widgets/syntax/TokenType.html" title="enum class in dev.tamboui.widgets.syntax"><code>TokenType</code></a> plus either a regex
 <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/Pattern.html" title="class or interface in java.util.regex" class="external-link"><code>Pattern</code></a> or a literal multi-line <code>open</code>/<code>close</code> pair.</div>
 </dd>
+<dt><a href="dev/tamboui/text/GraphemeClusters.html" class="type-name-link" title="class in dev.tamboui.text">GraphemeClusters</a> - Class in <a href="dev/tamboui/text/package-summary.html">dev.tamboui.text</a></dt>
+<dd>
+<div class="block">Utilities for navigating grapheme clusters in a <a href="https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/CharSequence.html" title="class or interface in java.lang" class="external-link"><code>CharSequence</code></a>.</div>
+</dd>
 <dt><a href="dev/tamboui/widgets/chart/Dataset.html#graphType()" class="member-name-link">graphType()</a> - Method in class dev.tamboui.widgets.chart.<a href="dev/tamboui/widgets/chart/Dataset.html" title="class in dev.tamboui.widgets.chart">Dataset</a></dt>
 <dd>
 <div class="block">Returns the graph type.</div>
@@ -11964,7 +11976,8 @@ for dynamic pseudo-class resolution.</div>
 </dd>
 <dt><a href="dev/tamboui/widgets/input/TextAreaState.html#moveCursorDown()" class="member-name-link">moveCursorDown()</a> - Method in class dev.tamboui.widgets.input.<a href="dev/tamboui/widgets/input/TextAreaState.html" title="class in dev.tamboui.widgets.input">TextAreaState</a></dt>
 <dd>
-<div class="block">Moves the cursor one logical row down (assumes <a href="dev/tamboui/style/Overflow.html#CLIP"><code>Overflow.CLIP</code></a>, no wrapping).</div>
+<div class="block">Moves the cursor one logical row down, keeping its screen column (assumes <a href="dev/tamboui/style/Overflow.html#CLIP"><code>Overflow.CLIP</code></a>,
+no wrapping).</div>
 </dd>
 <dt><a href="dev/tamboui/backend/aesh/AeshBackend.html#moveCursorDown(int)" class="member-name-link">moveCursorDown(int)</a> - Method in class dev.tamboui.backend.aesh.<a href="dev/tamboui/backend/aesh/AeshBackend.html" title="class in dev.tamboui.backend.aesh">AeshBackend</a></dt>
 <dd>&nbsp;</dd>
@@ -12042,7 +12055,8 @@ for dynamic pseudo-class resolution.</div>
 </dd>
 <dt><a href="dev/tamboui/widgets/input/TextAreaState.html#moveCursorUp()" class="member-name-link">moveCursorUp()</a> - Method in class dev.tamboui.widgets.input.<a href="dev/tamboui/widgets/input/TextAreaState.html" title="class in dev.tamboui.widgets.input">TextAreaState</a></dt>
 <dd>
-<div class="block">Moves the cursor one logical row up (assumes <a href="dev/tamboui/style/Overflow.html#CLIP"><code>Overflow.CLIP</code></a>, no wrapping).</div>
+<div class="block">Moves the cursor one logical row up, keeping its screen column (assumes <a href="dev/tamboui/style/Overflow.html#CLIP"><code>Overflow.CLIP</code></a>,
+no wrapping).</div>
 </dd>
 <dt><a href="dev/tamboui/backend/aesh/AeshBackend.html#moveCursorUp(int)" class="member-name-link">moveCursorUp(int)</a> - Method in class dev.tamboui.backend.aesh.<a href="dev/tamboui/backend/aesh/AeshBackend.html" title="class in dev.tamboui.backend.aesh">AeshBackend</a></dt>
 <dd>&nbsp;</dd>
@@ -13669,7 +13683,9 @@ one being typed token-by-token by an LLM) does not flicker as it grows.</div>
 <div class="block">Sets the width of the wave peak in characters.</div>
 </dd>
 <dt><a href="dev/tamboui/backend/aesh/AeshBackend.html#peek(int)" class="member-name-link">peek(int)</a> - Method in class dev.tamboui.backend.aesh.<a href="dev/tamboui/backend/aesh/AeshBackend.html" title="class in dev.tamboui.backend.aesh">AeshBackend</a></dt>
-<dd>&nbsp;</dd>
+<dd>
+<div class="block">Returns the next code point without consuming it, waiting up to <code>timeoutMs</code> for it.</div>
+</dd>
 <dt><a href="dev/tamboui/backend/jline3/JLineBackend.html#peek(int)" class="member-name-link">peek(int)</a> - Method in class dev.tamboui.backend.jline3.<a href="dev/tamboui/backend/jline3/JLineBackend.html" title="class in dev.tamboui.backend.jline3">JLineBackend</a></dt>
 <dd>&nbsp;</dd>
 <dt><a href="dev/tamboui/backend/panama/PanamaBackend.html#peek(int)" class="member-name-link">peek(int)</a> - Method in class dev.tamboui.backend.panama.<a href="dev/tamboui/backend/panama/PanamaBackend.html" title="class in dev.tamboui.backend.panama">PanamaBackend</a></dt>
