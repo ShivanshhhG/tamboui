@@ -4,18 +4,25 @@
  */
 package dev.tamboui.internal.record;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -130,6 +137,114 @@ class RecordingBackendTest {
         assertThat(mixedScreens(shots)).as("screenshots that mix two screens, of %d", count).isEmpty();
     }
 
+    @Test
+    @DisplayName("The cast written at the end of the tape is whole when the app quitting interrupts the thread writing it")
+    void castWrittenAtTheEndOfTheTapeIsWholeWhenItsThreadIsInterrupted() throws IOException {
+        Path cast = tempDir.resolve("out.cast");
+        AtomicInteger exits = new AtomicInteger();
+        RecordingBackend backend = new RecordingBackend(new TestBackend(10, 1),
+                new RecordingConfig(cast, 1, 60000, 10, 1, tape("Type \"q\"\n")), exits::incrementAndGet, () -> { });
+        draw(backend, Buffer.empty(AREA), screen("Saving..."));
+        draw(backend, screen("Saving..."), screen("Saved"));
+        assertThat(backend.read(0)).isEqualTo('q');
+
+        // The tape has ended, so this read() writes the cast, on the input thread. Meanwhile the app quits on the q,
+        // and TuiRunner.close() interrupts the input thread. On Java 8 that interrupt makes Files.write fail
+        Thread.currentThread().interrupt();
+        try {
+            backend.read(0);
+        } finally {
+            Thread.interrupted();
+        }
+
+        assertThat(exits).hasValue(1);
+        List<String> frames = frameOutputs(cast);
+        assertThat(frames).as("frames in the cast").hasSize(2);
+        assertThat(frames.get(1)).contains("Saved").doesNotContain("Saving");
+    }
+
+    @Test
+    @DisplayName("Closing while the end of the tape writes the cast returns once the cast is written")
+    void closeWaitsForTheCastWrittenAtTheEndOfTheTape() throws Exception {
+        Path cast = tempDir.resolve("out.cast");
+        CountDownLatch writing = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        RecordingBackend backend = new RecordingBackend(new TestBackend(10, 1),
+                new RecordingConfig(cast, 1, 60000, 10, 1, tape("Type \"q\"\n")), () -> { }, () -> {
+                    // Holds the input thread in the middle of writing the cast
+                    writing.countDown();
+                    try {
+                        release.await(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                });
+        draw(backend, Buffer.empty(AREA), screen("Saving..."));
+        draw(backend, screen("Saving..."), screen("Saved"));
+        assertThat(backend.read(0)).isEqualTo('q');
+
+        ExecutorService inputThread = Executors.newSingleThreadExecutor();
+        try {
+            // The tape has ended, so the input thread writes the cast...
+            Future<Integer> tapeEnd = inputThread.submit(() -> backend.read(0));
+            assertThat(writing.await(10, TimeUnit.SECONDS)).isTrue();
+            // ...while the app quits on the q and closes the backend. Once close() returns, main() returns and the JVM
+            // exits, without waiting for the input thread, a daemon thread
+            FutureTask<List<String>> closing = new FutureTask<>(() -> {
+                backend.close();
+                return Files.exists(cast) ? frameOutputs(cast) : Collections.<String>emptyList();
+            });
+            Thread appThread = new Thread(closing);
+            appThread.start();
+            awaitWaitingOrEnded(appThread);
+            release.countDown();
+
+            assertThat(closing.get(10, TimeUnit.SECONDS)).as("frames in the cast when close() returned").hasSize(2);
+            tapeEnd.get(10, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            inputThread.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("A cast that cannot be written at the end of the tape is reported, not ignored")
+    void castThatCannotBeWrittenAtTheEndOfTheTapeIsReported() throws IOException {
+        // A directory is in the way of the cast
+        Path cast = Files.createDirectory(tempDir.resolve("out.cast"));
+        AtomicInteger exits = new AtomicInteger();
+        RecordingBackend backend = new RecordingBackend(new TestBackend(10, 1),
+                new RecordingConfig(cast, 1, 60000, 10, 1, tape("Type \"q\"\n")), exits::incrementAndGet, () -> { });
+        draw(backend, Buffer.empty(AREA), screen("Saved"));
+        assertThat(backend.read(0)).isEqualTo('q');
+
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(err, true, "UTF-8"));
+        try {
+            // The tape has ended, so this read() writes the cast
+            backend.read(0);
+        } finally {
+            System.setErr(originalErr);
+        }
+
+        assertThat(exits).hasValue(1);
+        assertThat(err.toString("UTF-8")).contains("Failed to write recording: " + cast);
+    }
+
+    /** Waits until the thread waits for something, or has ended. */
+    private static void awaitWaitingOrEnded(Thread thread) throws InterruptedException {
+        Set<Thread.State> waitingOrEnded = EnumSet.of(Thread.State.WAITING, Thread.State.TIMED_WAITING,
+                Thread.State.TERMINATED);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!waitingOrEnded.contains(thread.getState())) {
+            assertThat(deadline - System.nanoTime())
+                    .as("time left for %s to wait or end, in state %s", thread.getName(), thread.getState())
+                    .isPositive();
+            thread.join(1);
+        }
+    }
+
     /** Plays the tape with read(), as the input thread does, until it is done or {@code drawing} turns false. */
     private interface Playback {
         void play(AtomicBoolean drawing) throws Exception;
@@ -212,7 +327,9 @@ class RecordingBackendTest {
     private static List<String> frameOutputs(Path cast) throws IOException {
         List<String> outputs = new ArrayList<>();
         List<String> lines = Files.readAllLines(cast, StandardCharsets.UTF_8);
-        for (String line : lines.subList(1, lines.size())) {
+        // The first line is the header
+        for (int i = 1; i < lines.size(); i++) {
+            String line = lines.get(i);
             String output = line.substring(line.indexOf("\"o\", \"") + 6, line.lastIndexOf('"'));
             if (!output.isEmpty()) {
                 outputs.add(output);

@@ -4,12 +4,15 @@
  */
 package dev.tamboui.internal.record;
 
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import dev.tamboui.buffer.Buffer;
@@ -25,6 +28,10 @@ import dev.tamboui.terminal.Backend;
  * This is an internal API and not part of the public contract.
  */
 public final class RecordingBackend implements Backend {
+
+    // How long close() waits for the cast that another thread writes: a big recording takes a while to build, while a
+    // write that is stuck must not keep the app from exiting
+    private static final long CAST_WAIT_SECONDS = 10;
 
     private final Backend delegate;
     private final RecordingConfig config;
@@ -46,6 +53,10 @@ public final class RecordingBackend implements Backend {
     private volatile boolean recording;
     private volatile boolean closed;
     private volatile boolean hasDrawn;  // Track if draw() was ever called
+    // Counted down by the thread that stopped the recording once it has written the cast, or found nothing to write
+    private final CountDownLatch castWritten = new CountDownLatch(1);
+    private final Runnable exit;
+    private final Runnable beforeCastWrite;
 
     /**
      * Creates a new recording backend wrapping the given delegate.
@@ -54,8 +65,20 @@ public final class RecordingBackend implements Backend {
      * @param config   the recording configuration
      */
     public RecordingBackend(Backend delegate, RecordingConfig config) {
+        this(delegate, config, () -> System.exit(0), () -> { });
+    }
+
+    /**
+     * Creates a recording backend with hooks for tests. {@code exit} runs where {@link #read(int)} exits the JVM once
+     * it has written the cast at the end of the tape or of the duration limit. {@code beforeCastWrite} runs on the
+     * thread that writes the cast, after the cast is built and before the file is written, so a test can hold that
+     * thread there.
+     */
+    RecordingBackend(Backend delegate, RecordingConfig config, Runnable exit, Runnable beforeCastWrite) {
         this.delegate = delegate;
         this.config = config;
+        this.exit = exit;
+        this.beforeCastWrite = beforeCastWrite;
         this.overrideSize = new Size(config.width(), config.height());
         this.buffer = Buffer.empty(new Rect(0, 0, config.width(), config.height()));
         this.frames = new ArrayList<>();
@@ -262,22 +285,12 @@ public final class RecordingBackend implements Backend {
         // Interactions finished - if we HAD interactions, exit now
         // (the recording file should end with a quit key)
         if (!interactionPlayer.hasNoInteractions() && stop()) {
-            try {
-                writeCastFromDrawFrames();
-            } catch (IOException e) {
-                // Ignore write errors
-            }
-            System.exit(0);
+            writeCastAndExit();
         }
 
         // No interactions defined - wait for duration limit
         if (!isRecording() && stop()) {
-            try {
-                writeCastFromDrawFrames();
-            } catch (IOException e) {
-                // Ignore write errors
-            }
-            System.exit(0);
+            writeCastAndExit();
         }
 
         // Wait a bit
@@ -298,12 +311,16 @@ public final class RecordingBackend implements Backend {
     @Override
     public void close() throws IOException {
         if (!stop()) {
+            // The end of the tape or of the duration limit stopped the recording on the input thread, which writes the
+            // cast while the app quits. Once close() returns, main() can return, and the JVM exits without waiting for
+            // the input thread, a daemon thread
+            awaitCast();
             return;
         }
 
         // Write cast file only if we have frames from Backend.draw() calls (TUI demos)
         // System.out capture is handled by the shutdown hook
-        writeCastFromDrawFrames();
+        writeCast();
 
         // Close delegate
         delegate.close();
@@ -322,6 +339,59 @@ public final class RecordingBackend implements Backend {
             closed = true;
             recording = false;
             return true;
+        }
+    }
+
+    /**
+     * Writes the cast, then exits, when the end of the tape or of the duration limit stopped the recording in
+     * {@link #read(int)}. The cast is written before the exit, whose shutdown hooks may close this backend and so wait
+     * for it.
+     */
+    private void writeCastAndExit() {
+        try {
+            writeCast();
+        } catch (IOException e) {
+            System.err.println("Failed to write recording: " + e.getMessage());
+        }
+        exit.run();
+    }
+
+    /**
+     * Writes the cast on the thread that {@linkplain #stop() stopped} the recording, then lets a {@link #close()} that
+     * waits for it go on.
+     */
+    private void writeCast() throws IOException {
+        try {
+            writeCastFromDrawFrames();
+        } finally {
+            castWritten.countDown();
+        }
+    }
+
+    /**
+     * Waits, at most {@value #CAST_WAIT_SECONDS} seconds, for the thread that stopped the recording to write the cast.
+     * An interrupt does not end the wait early, which would let the JVM exit with the cast cut off; it is kept for the
+     * caller.
+     */
+    private void awaitCast() {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(CAST_WAIT_SECONDS);
+        boolean interrupted = false;
+        try {
+            while (true) {
+                try {
+                    if (!castWritten.await(deadline - System.nanoTime(), TimeUnit.NANOSECONDS)) {
+                        System.err.println("Gave up waiting " + CAST_WAIT_SECONDS + "s for the recording to be saved to: "
+                                + config.outputPath());
+                    }
+                    return;
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -358,7 +428,12 @@ public final class RecordingBackend implements Backend {
             Files.createDirectories(parent);
         }
 
-        Files.write(outputPath, cast.getBytes(StandardCharsets.UTF_8));
+        beforeCastWrite.run();
+        // Not Files.write: on Java 8 an interrupt closes the channel it writes to, and the app quitting interrupts the
+        // input thread, which writes the cast at the end of the tape
+        try (OutputStream out = new FileOutputStream(outputPath.toFile())) {
+            out.write(cast.getBytes(StandardCharsets.UTF_8));
+        }
         System.out.println("Recording saved to: " + outputPath);
         System.out.println("Frames captured: " + recorded.size());
     }
