@@ -4,6 +4,9 @@
  */
 package dev.tamboui.text;
 
+import java.time.Duration;
+import java.util.List;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +16,7 @@ import dev.tamboui.style.Style;
 import dev.tamboui.style.Tags;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class MarkupParserTest {
 
@@ -370,6 +374,67 @@ class MarkupParserTest {
         assertThat(text.lines().get(0).spans().get(0).content()).isEqualTo("Normal ");
         assertThat(text.lines().get(0).spans().get(1).content()).isEqualTo("bold till end");
         assertThat(text.lines().get(0).spans().get(1).style().addModifiers()).contains(dev.tamboui.style.Modifier.BOLD);
+    }
+
+    @Test
+    @DisplayName("a bracket that is never closed is text")
+    void bracketNeverClosedIsText() {
+        assertThat(MarkupParser.parse("price[USD").rawContent()).isEqualTo("price[USD");
+        assertThat(MarkupParser.parse("a [b c").rawContent()).isEqualTo("a [b c");
+        assertThat(MarkupParser.parse("done [/b").rawContent()).isEqualTo("done [/b");
+    }
+
+    @Test
+    @DisplayName("a bracket that is never closed does not apply the style it names")
+    void bracketNeverClosedAppliesNoStyle() {
+        Text text = MarkupParser.parse("x[i");
+
+        assertThat(text.rawContent()).isEqualTo("x[i");
+        assertThat(text.lines().get(0).spans()).hasSize(1);
+        assertThat(text.lines().get(0).spans().get(0).style()).isEqualTo(Style.EMPTY);
+    }
+
+    @Test
+    @DisplayName("a bracket with a value that is never closed is text and styles nothing after it")
+    void bracketWithValueNeverClosedIsText() {
+        Text text = MarkupParser.parse("x[i=1\ny");
+
+        assertThat(text.lines()).hasSize(2);
+        assertThat(text.lines().get(0).rawContent()).isEqualTo("x[i=1");
+        assertThat(text.lines().get(1).rawContent()).isEqualTo("y");
+        assertThat(text.lines().get(1).spans().get(0).style()).isEqualTo(Style.EMPTY);
+    }
+
+    @Test
+    @DisplayName("tags before and after a bracket that is never closed still apply")
+    void tagsAroundBracketNeverClosedStillApply() {
+        Text text = MarkupParser.parse("[red]order[/red] [ORD-42 [bold]shipped");
+
+        assertThat(text.rawContent()).isEqualTo("order [ORD-42 shipped");
+        List<Span> spans = text.lines().get(0).spans();
+        assertThat(spans.get(0).content()).isEqualTo("order");
+        assertThat(spans.get(0).style().fg()).contains(Color.RED);
+        assertThat(spans.get(1).content()).isEqualTo(" [ORD-42 ");
+        assertThat(spans.get(1).style().fg()).isEmpty();
+        assertThat(spans.get(2).content()).isEqualTo("shipped");
+        assertThat(spans.get(2).style().addModifiers()).contains(Modifier.BOLD);
+
+        Text atEnd = MarkupParser.parse("[red]error[/red] at [12:00");
+        assertThat(atEnd.rawContent()).isEqualTo("error at [12:00");
+        assertThat(atEnd.lines().get(0).spans().get(0).style().fg()).contains(Color.RED);
+    }
+
+    @Test
+    @DisplayName("a long line of brackets with values that are never closed parses quickly")
+    void longLineOfBracketsNeverClosedParsesQuickly() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 50000; i++) {
+            sb.append("[a=");
+        }
+        String line = sb.toString();
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+            assertThat(MarkupParser.parse(line).rawContent()).isEqualTo(line));
     }
 
     @Test

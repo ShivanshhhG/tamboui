@@ -59,6 +59,7 @@ import dev.tamboui.style.Tags;
  * <p>
  * Unknown tags without a resolver are rendered as plain text (tags are preserved).
  * Unclosed tags apply their style to the remaining content.
+ * A {@code [} that is not closed by a {@code ]} on the same line is plain text.
  */
 public final class MarkupParser {
 
@@ -209,11 +210,14 @@ public final class MarkupParser {
         private List<Span> currentLineSpans;
         private StringBuilder currentText;
         private Style currentStyle;
+        // A '[' before this position has no ']' after it on its line, so it is text
+        private int unclosedUntil;
 
         Parser(String input, StyleResolver resolver) {
             this.input = input;
             this.resolver = resolver;
             this.pos = 0;
+            this.unclosedUntil = 0;
             this.styleStack = new ArrayDeque<>();
             this.lines = new ArrayList<>();
             this.currentLineSpans = new ArrayList<>();
@@ -283,6 +287,11 @@ public final class MarkupParser {
 
         private void handleTag() {
             int tagStart = pos;
+            if (tagStart < unclosedUntil) {
+                currentText.append('[');
+                pos++;
+                return;
+            }
             pos++; // Skip '['
 
             // Check if it's a closing tag
@@ -295,11 +304,13 @@ public final class MarkupParser {
             // Read tag name (and optional attribute)
             StringBuilder tagNameBuilder = new StringBuilder();
             String attribute = null;
+            boolean closed = false;
 
             while (pos < input.length()) {
                 char c = input.charAt(pos);
                 if (c == ']') {
                     pos++; // Skip ']'
+                    closed = true;
                     break;
                 } else if (c == '=' && !isClosing) {
                     // Attribute value follows
@@ -307,18 +318,26 @@ public final class MarkupParser {
                     attribute = readAttributeValue();
                     if (pos < input.length() && input.charAt(pos) == ']') {
                         pos++;
+                        closed = true;
                     }
                     break;
                 } else if (c == '\n' || c == '[') {
-                    // Malformed tag, treat as text
-                    pos = tagStart;
-                    currentText.append(input.charAt(pos));
-                    pos++;
-                    return;
+                    break;
                 } else {
                     tagNameBuilder.append(c);
                     pos++;
                 }
+            }
+
+            if (!closed) {
+                // Malformed or unclosed tag: the '[' is text, and parsing resumes after it
+                if (pos == input.length() || input.charAt(pos) == '\n') {
+                    // No ']' up to the end of the line, so every '[' up to here is text as well
+                    unclosedUntil = pos;
+                }
+                currentText.append('[');
+                pos = tagStart + 1;
+                return;
             }
 
             String tagName = tagNameBuilder.toString().toLowerCase().trim();

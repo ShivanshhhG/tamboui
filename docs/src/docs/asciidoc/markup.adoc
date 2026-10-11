@@ -149,6 +149,8 @@ Path: C:\\Users\\name      renders as:  Path: C:\Users\name
 
 Supported backslash escapes: `\[`, `\]`, `\\`. Other sequences (like `\n`) are preserved as-is.
 
+A `[` that is not closed by a `]` on the same line needs no escape: it is plain text, so `price[USD 10` renders as `price[USD 10`.
+
 === Nesting
 
 Tags can be nested for combined effects:
