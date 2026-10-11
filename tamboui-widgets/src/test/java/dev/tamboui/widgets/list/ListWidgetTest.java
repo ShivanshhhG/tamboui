@@ -13,6 +13,8 @@ import dev.tamboui.buffer.Buffer;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
 import dev.tamboui.style.Style;
+import dev.tamboui.text.Text;
+import dev.tamboui.widgets.common.ScrollBarPolicy;
 import dev.tamboui.widgets.common.SizedWidget;
 import dev.tamboui.widgets.paragraph.Paragraph;
 
@@ -269,5 +271,35 @@ class ListWidgetTest {
         state.selectLast(10);
 
         assertThat(state.selected()).isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("AS_NEEDED scrollbar does not cover multi-line items that fit by count")
+    void asNeededScrollbarDoesNotCoverMultiLineItems() {
+        SizedWidget item = SizedWidget.ofHeight(
+            Paragraph.builder().text(Text.from("abc\ndef\nghi")).right().build(), 3);
+        ListWidget list = ListWidget.builder()
+            .items(Arrays.asList(item, item, item))
+            .highlightSymbol("")
+            .scrollBarPolicy(ScrollBarPolicy.AS_NEEDED)
+            .build();
+        // 3 items for 5 rows, but 9 lines in total
+        Rect area = new Rect(0, 0, 8, 5);
+        Buffer buffer = Buffer.empty(area);
+
+        list.render(area, buffer, new ListState());
+
+        // The right-aligned text ends in column 6, next to the scrollbar in column 7
+        Buffer expected = Buffer.empty(area);
+        expected.setString(4, 0, "abc", Style.EMPTY);
+        expected.setString(4, 1, "def", Style.EMPTY);
+        expected.setString(4, 2, "ghi", Style.EMPTY);
+        expected.setString(4, 3, "abc", Style.EMPTY);
+        expected.setString(4, 4, "def", Style.EMPTY);
+        for (int y = 0; y < 5; y++) {
+            expected.setString(7, y, y < 3 ? "█" : "│", Style.EMPTY);
+        }
+
+        assertThat(buffer).isEqualTo(expected);
     }
 }

@@ -18,6 +18,7 @@ import dev.tamboui.text.Text;
 import dev.tamboui.toolkit.AbstractElementTest;
 import dev.tamboui.toolkit.element.DefaultRenderContext;
 import dev.tamboui.toolkit.element.RenderContext;
+import dev.tamboui.widgets.common.ScrollBarPolicy;
 
 import static dev.tamboui.assertj.BufferAssertions.assertThat;
 import static dev.tamboui.toolkit.Toolkit.markupTextArea;
@@ -386,5 +387,22 @@ class MarkupTextAreaElementTest extends AbstractElementTest {
         // Should have styled areas with both CSS classes
         assertThat(hasEffect1).isTrue();
         assertThat(hasEffect2).isTrue();
+    }
+
+    @Test
+    @DisplayName("AS_NEEDED scrollbar for wide but short content reserves its column, no color bleed")
+    void asNeededScrollbarReservesColumnForWideContent() {
+        // One line fits vertically in four rows, but is wider than the 12-column viewport, so the
+        // content is horizontally scrollable and a scrollbar is shown. The scrollbar column must be
+        // reserved so it is not drawn over the last column of text (which would take the text's color).
+        Rect area = new Rect(0, 0, 12, 4);
+        Buffer buffer = Buffer.empty(area);
+        Frame frame = Frame.forTesting(buffer);
+
+        markupTextArea("[red]ABCDEFGHIJKLMNOPQRSTUVWXYZ[/red]")
+            .scrollbar(ScrollBarPolicy.AS_NEEDED)
+            .render(frame, area, RenderContext.empty());
+
+        assertThat(buffer.get(11, 0).style().fg()).isEmpty();
     }
 }

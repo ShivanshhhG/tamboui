@@ -113,21 +113,6 @@ public final class ListWidget implements StatefulWidget<ListState> {
         int visibleHeight = listArea.height();
         int symbolWidth = highlightSymbol.width();
 
-        // Determine if we should reserve space for scrollbar (heuristic)
-        boolean reserveScrollbarSpace = scrollBarPolicy == ScrollBarPolicy.ALWAYS
-                || (scrollBarPolicy == ScrollBarPolicy.AS_NEEDED && totalItems > visibleHeight);
-
-        // Calculate content area
-        int contentX = listArea.left() + symbolWidth;
-        int contentWidth = listArea.width() - symbolWidth;
-        if (reserveScrollbarSpace) {
-            contentWidth -= 1;
-        }
-
-        if (contentWidth <= 0) {
-            return;
-        }
-
         // Calculate item heights
         int[] itemHeights = new int[totalItems];
         int totalHeight = 0;
@@ -136,11 +121,21 @@ public final class ListWidget implements StatefulWidget<ListState> {
             totalHeight += itemHeights[i];
         }
 
-        int maxScroll = Math.max(0, totalHeight - visibleHeight);
-
-        // Final determination of whether to show scrollbar
         boolean showScrollbar = scrollBarPolicy == ScrollBarPolicy.ALWAYS
                 || (scrollBarPolicy == ScrollBarPolicy.AS_NEEDED && totalHeight > visibleHeight);
+
+        // Calculate content area, leaving the last column to the scrollbar
+        int contentX = listArea.left() + symbolWidth;
+        int contentWidth = listArea.width() - symbolWidth;
+        if (showScrollbar) {
+            contentWidth -= 1;
+        }
+
+        if (contentWidth <= 0) {
+            return;
+        }
+
+        int maxScroll = Math.max(0, totalHeight - visibleHeight);
 
         // Apply scroll mode logic
         switch (scrollMode) {

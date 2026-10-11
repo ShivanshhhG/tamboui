@@ -486,9 +486,15 @@ public final class RichTextAreaElement extends StyledElement<RichTextAreaElement
             lineNumberWidth = String.valueOf(totalLines).length() + lineNumberSeparator.length();
         }
 
-        // Determine if we should show scrollbar
+        // Reserve a scrollbar column whenever a scrollbar will be shown: content taller OR wider than the
+        // viewport, the same test as RichTextState.isScrollable() used below. Reserving only narrows the
+        // width, so scrollable content stays scrollable and the later show agrees. Checking the width here
+        // keeps the scrollbar off the last column of content that is wide but short.
+        int viewportWidth = Math.max(0, contentArea.width() - lineNumberWidth);
+        boolean scrollable = text.height() > contentArea.height()
+                || maxLineWidth(text.lines()) > viewportWidth;
         boolean reserveScrollbarSpace = scrollBarPolicy == ScrollBarPolicy.ALWAYS
-                || (scrollBarPolicy == ScrollBarPolicy.AS_NEEDED && text.height() > contentArea.height());
+                || (scrollBarPolicy == ScrollBarPolicy.AS_NEEDED && scrollable);
 
         // Calculate the actual rendering area for text (excluding scrollbar and line numbers)
         Rect textRenderArea = contentArea;
