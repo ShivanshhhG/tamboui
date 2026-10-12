@@ -323,7 +323,10 @@ for backend discovery.</div>
 <p>
 Exceptions thrown during rendering are caught and handled according to
 the configured <a href="error/RenderErrorHandler.html" title="interface in dev.tamboui.tui.error"><code>RenderErrorHandler</code></a>. By default, errors are displayed
-in the UI and the application waits for user dismissal before quitting.</div>
+in the UI and the application waits for user dismissal before quitting.
+<p>
+The loop also ends, as if <a href="#quit()"><code>quit()</code></a> was called, when reading terminal
+input keeps failing.</div>
 <dl class="notes">
 <dt>Parameters:</dt>
 <dd><code>handler</code> - the event handler</dd>

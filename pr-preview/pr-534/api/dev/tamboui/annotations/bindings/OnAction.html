@@ -97,8 +97,11 @@ The annotated method must:
 <ul>
   <li>Have exactly one parameter of type <code>Event</code> (or a subtype)</li>
   <li>Return <code>void</code></li>
-  <li>Be accessible (not private)</li>
-</ul></div>
+  <li>Be accessible (not private, nor in a private class)</li>
+</ul>
+<p>
+A method that takes a subtype, such as <code>KeyEvent</code>, is only called for
+events of that type.</div>
 </div>
 </section>
 <section class="summary">
