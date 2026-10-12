@@ -239,7 +239,12 @@ public final class ActionHandler {
             if (annotation != null) {
                 String action = annotation.value();
                 method.setAccessible(true);
+                Class<?>[] parameterTypes = method.getParameterTypes();
                 on(action, event -> {
+                    // A method taking a subtype such as KeyEvent is only called for events of that type
+                    if (parameterTypes.length == 1 && !parameterTypes[0].isInstance(event)) {
+                        return;
+                    }
                     try {
                         method.invoke(target, event);
                     } catch (Exception e) {

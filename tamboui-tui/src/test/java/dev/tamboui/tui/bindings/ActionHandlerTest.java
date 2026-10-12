@@ -10,11 +10,13 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import dev.tamboui.annotations.bindings.OnAction;
 import dev.tamboui.tui.event.ActionEvent;
 import dev.tamboui.tui.event.Event;
 import dev.tamboui.tui.event.KeyCode;
 import dev.tamboui.tui.event.KeyEvent;
 import dev.tamboui.tui.event.KeyModifiers;
+import dev.tamboui.tui.event.MouseButton;
 import dev.tamboui.tui.event.MouseEvent;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -303,5 +305,27 @@ class ActionHandlerTest {
 
         // fire works because it bypasses bindings
         assertThat(handler.fire("refresh", rEvent)).isTrue();
+    }
+
+    @Test
+    void registerAnnotatedCallsAMethodTakingAnEventSubtypeOnlyForEventsOfThatType() {
+        KeyHandlers target = new KeyHandlers();
+        handler.registerAnnotated(target);
+        KeyEvent key = KeyEvent.ofChar('x');
+
+        handler.fire("insert", key);
+        handler.fire("insert", MouseEvent.press(MouseButton.LEFT, 0, 0));
+        handler.fire("insert");
+
+        assertThat(target.received).containsExactly(key);
+    }
+
+    static class KeyHandlers {
+        private final List<KeyEvent> received = new ArrayList<>();
+
+        @OnAction("insert")
+        void insert(KeyEvent event) {
+            received.add(event);
+        }
     }
 }

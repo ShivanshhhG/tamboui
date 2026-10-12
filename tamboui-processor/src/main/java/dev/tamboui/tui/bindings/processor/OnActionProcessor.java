@@ -29,6 +29,8 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -99,9 +101,13 @@ public class OnActionProcessor extends AbstractProcessor {
             TypeElement enclosingClass = (TypeElement) method.getEnclosingElement();
             OnAction annotation = method.getAnnotation(OnAction.class);
 
+            TypeMirror parameterType = method.getParameters().get(0).asType();
+            String eventSubtype = eventSubtypeOf(parameterType);
+
             methodsByClass
                     .computeIfAbsent(enclosingClass, k -> new ArrayList<>())
-                    .add(new MethodInfo(method.getSimpleName().toString(), annotation.value()));
+                    .add(new MethodInfo(method.getSimpleName().toString(), annotation.value(),
+                            eventSubtype, eventSubtype != null && hasTypeArguments(parameterType)));
         }
 
         // Generate registrar for each class
@@ -135,9 +141,15 @@ public class OnActionProcessor extends AbstractProcessor {
             return false;
         }
 
+        // The generated registrar, in the same package, must be able to name the class
+        if (isInPrivateClass(method)) {
+            error(method, "@OnAction methods must not be in a private class");
+            return false;
+        }
+
         // Check return type is void
         if (!typeUtils.isSameType(method.getReturnType(),
-                typeUtils.getNoType(javax.lang.model.type.TypeKind.VOID))) {
+                typeUtils.getNoType(TypeKind.VOID))) {
             error(method, "@OnAction methods must return void");
             return false;
         }
@@ -162,11 +174,43 @@ public class OnActionProcessor extends AbstractProcessor {
         return true;
     }
 
+    private static boolean isInPrivateClass(ExecutableElement method) {
+        Element enclosing = method.getEnclosingElement();
+        while (enclosing instanceof TypeElement) {
+            if (enclosing.getModifiers().contains(Modifier.PRIVATE)) {
+                return true;
+            }
+            enclosing = enclosing.getEnclosingElement();
+        }
+        return false;
+    }
+
+    /**
+     * Returns the qualified name of the parameter type when it is a subtype of
+     * {@code Event}, which a method reference can't take, or {@code null} when
+     * the method takes any event.
+     */
+    private String eventSubtypeOf(TypeMirror parameterType) {
+        TypeMirror erasure = typeUtils.erasure(parameterType);
+        if (eventType == null || typeUtils.isAssignable(eventType, erasure)) {
+            return null;
+        }
+        return ((TypeElement) typeUtils.asElement(erasure)).getQualifiedName().toString();
+    }
+
+    private static boolean hasTypeArguments(TypeMirror type) {
+        return type.getKind() == TypeKind.DECLARED && !((DeclaredType) type).getTypeArguments().isEmpty();
+    }
+
     private String generateRegistrar(TypeElement targetClass, List<MethodInfo> methods)
             throws IOException {
         String packageName = getPackageName(targetClass);
-        String className = targetClass.getSimpleName().toString();
-        String registrarClassName = className + "_ActionHandlerRegistrar";
+        // Outer.Inner for a nested class: how the class is named from its package
+        String qualifiedClassName = targetClass.getQualifiedName().toString();
+        String className = packageName.isEmpty()
+                ? qualifiedClassName
+                : qualifiedClassName.substring(packageName.length() + 1);
+        String registrarClassName = className.replace('.', '_') + "_ActionHandlerRegistrar";
         String qualifiedName = packageName.isEmpty()
                 ? registrarClassName
                 : packageName + "." + registrarClassName;
@@ -193,10 +237,23 @@ public class OnActionProcessor extends AbstractProcessor {
 
             // register method
             writer.write("    @Override\n");
+            if (methods.stream().anyMatch(method -> method.uncheckedCast)) {
+                writer.write("    @SuppressWarnings(\"unchecked\")\n");
+            }
             writer.write("    public void register(" + className + " target, ActionHandler handler) {\n");
             for (MethodInfo method : methods) {
-                writer.write("        handler.on(\"" + escapeString(method.actionName)
-                        + "\", target::" + method.methodName + ");\n");
+                String action = "\"" + escapeString(method.actionName) + "\"";
+                if (method.eventSubtype == null) {
+                    writer.write("        handler.on(" + action + ", target::" + method.methodName + ");\n");
+                } else {
+                    // A method taking a subtype such as KeyEvent is only called for events of that type
+                    writer.write("        handler.on(" + action + ", event -> {\n");
+                    writer.write("            if (event instanceof " + method.eventSubtype + ") {\n");
+                    writer.write("                target." + method.methodName
+                            + "((" + method.eventSubtype + ") event);\n");
+                    writer.write("            }\n");
+                    writer.write("        });\n");
+                }
             }
             writer.write("    }\n\n");
 
@@ -253,10 +310,16 @@ public class OnActionProcessor extends AbstractProcessor {
     private static class MethodInfo {
         final String methodName;
         final String actionName;
+        // The Event subtype the method takes, or null when it takes any Event
+        final String eventSubtype;
+        // Whether the cast to the subtype is unchecked, as for ActionEvent<Void>
+        final boolean uncheckedCast;
 
-        MethodInfo(String methodName, String actionName) {
+        MethodInfo(String methodName, String actionName, String eventSubtype, boolean uncheckedCast) {
             this.methodName = methodName;
             this.actionName = actionName;
+            this.eventSubtype = eventSubtype;
+            this.uncheckedCast = uncheckedCast;
         }
     }
 }

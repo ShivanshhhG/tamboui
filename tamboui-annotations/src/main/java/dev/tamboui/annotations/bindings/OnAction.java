@@ -33,8 +33,11 @@ import java.lang.annotation.Target;
  * <ul>
  *   <li>Have exactly one parameter of type {@code Event} (or a subtype)</li>
  *   <li>Return {@code void}</li>
- *   <li>Be accessible (not private)</li>
+ *   <li>Be accessible (not private, nor in a private class)</li>
  * </ul>
+ * <p>
+ * A method that takes a subtype, such as {@code KeyEvent}, is only called for
+ * events of that type.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

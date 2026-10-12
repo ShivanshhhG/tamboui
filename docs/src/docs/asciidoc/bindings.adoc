@@ -141,6 +141,7 @@ include::{snippets-dir}/dev/tamboui/docs/snippets/BindingsSnippets.java[tags=on-
 ----
 
 The component framework discovers these methods and dispatches events automatically.
+A method can take `Event` or a subtype such as `KeyEvent` or `MouseEvent`; a method that takes a subtype is only called for events of that type.
 
 === Annotation Processing
 
