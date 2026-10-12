@@ -7,6 +7,7 @@ package dev.tamboui.tui.bindings.processor;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -56,6 +57,13 @@ class OnActionProcessorTest {
                 }
             }
         };
+    }
+
+    /** Returns the class a generated registrar registers handlers for. */
+    private static Class<?> targetTypeOf(ClassLoader loader, String registrarClass) throws Exception {
+        ActionHandlerRegistrar<?> registrar = (ActionHandlerRegistrar<?>) loader.loadClass(registrarClass)
+                .getDeclaredConstructor().newInstance();
+        return registrar.targetType();
     }
 
     @Test
@@ -426,5 +434,106 @@ class OnActionProcessorTest {
 
         Object received = target.getClass().getField("received").get(target);
         Assertions.assertThat(received).isEqualTo(Collections.singletonList(key));
+    }
+
+    @Test
+    void generatedRegistrarOfAGenericClassCompilesWithoutWarningsAndDispatchesActions() throws Exception {
+        JavaFileObject source = JavaFileObjects.forSourceString(
+                "test.MyHandler",
+                "package test;\n" +
+                "\n" +
+                "import java.util.ArrayList;\n" +
+                "import java.util.List;\n" +
+                "\n" +
+                "import dev.tamboui.annotations.bindings.OnAction;\n" +
+                "import dev.tamboui.tui.event.Event;\n" +
+                "import dev.tamboui.tui.event.KeyEvent;\n" +
+                "\n" +
+                "public class MyHandler<T, K extends KeyEvent> {\n" +
+                "    public final List<Event> received = new ArrayList<>();\n" +
+                "\n" +
+                "    @OnAction(\"save\")\n" +
+                "    void save(Event event) {\n" +
+                "        received.add(event);\n" +
+                "    }\n" +
+                "\n" +
+                "    @OnAction(\"insert\")\n" +
+                "    void insert(K event) {\n" +
+                "        received.add(event);\n" +
+                "    }\n" +
+                "}\n"
+        );
+
+        // with the lint options the TamboUI build uses
+        Compilation compilation = javac()
+                .withProcessors(new OnActionProcessor())
+                .withOptions("--release", "8", "-Xlint:all", "-Xlint:-options", "-Werror")
+                .compile(source);
+        assertThat(compilation).succeeded();
+
+        ClassLoader loader = classLoaderFor(compilation);
+        Class<?> targetClass = loader.loadClass("test.MyHandler");
+        Object target = targetClass.getDeclaredConstructor().newInstance();
+        @SuppressWarnings("unchecked")
+        ActionHandlerRegistrar<Object> registrar = (ActionHandlerRegistrar<Object>) loader
+                .loadClass("test.MyHandler_ActionHandlerRegistrar").getDeclaredConstructor().newInstance();
+        // ActionHandler.registerAnnotated uses the registrar whose target type is the target's class
+        Assertions.assertThat(registrar.targetType()).isSameAs(targetClass);
+        ActionHandler handler = new ActionHandler(BindingSets.standard());
+        registrar.register(target, handler);
+        KeyEvent key = KeyEvent.ofChar('x');
+        MouseEvent click = MouseEvent.press(MouseButton.LEFT, 0, 0);
+
+        handler.fire("save", click);
+        handler.fire("insert", key);
+        handler.fire("insert", click);
+
+        Object received = targetClass.getField("received").get(target);
+        Assertions.assertThat(received).isEqualTo(Arrays.asList(click, key));
+    }
+
+    @Test
+    void generatesRegistrarsWithoutWarningsForNestedClassesOfGenericClasses() throws Exception {
+        JavaFileObject source = JavaFileObjects.forSourceString(
+                "test.Outer",
+                "package test;\n" +
+                "\n" +
+                "import dev.tamboui.annotations.bindings.OnAction;\n" +
+                "import dev.tamboui.tui.event.Event;\n" +
+                "\n" +
+                "public class Outer<T> {\n" +
+                "    public static class Nested<U> {\n" +
+                "        @OnAction(\"save\")\n" +
+                "        void save(Event event) {}\n" +
+                "    }\n" +
+                "\n" +
+                "    public class Inner {\n" +
+                "        @OnAction(\"close\")\n" +
+                "        void close(Event event) {}\n" +
+                "    }\n" +
+                "\n" +
+                "    public static class Plain {\n" +
+                "        @OnAction(\"quit\")\n" +
+                "        void quit(Event event) {}\n" +
+                "    }\n" +
+                "}\n"
+        );
+
+        Compilation compilation = javac()
+                .withProcessors(new OnActionProcessor())
+                .withOptions("--release", "8", "-Xlint:all", "-Xlint:-options", "-Werror")
+                .compile(source);
+
+        assertThat(compilation).succeeded();
+        ClassLoader loader = classLoaderFor(compilation);
+        Assertions.assertThat(targetTypeOf(loader, "test.Outer_Nested_ActionHandlerRegistrar"))
+                .isSameAs(loader.loadClass("test.Outer$Nested"));
+        Assertions.assertThat(targetTypeOf(loader, "test.Outer_Inner_ActionHandlerRegistrar"))
+                .isSameAs(loader.loadClass("test.Outer$Inner"));
+        // a static class in a generic class is not generic itself: nothing to suppress
+        assertThat(compilation)
+                .generatedSourceFile("test.Outer_Plain_ActionHandlerRegistrar")
+                .contentsAsUtf8String()
+                .doesNotContain("@SuppressWarnings");
     }
 }
