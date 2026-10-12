@@ -9,8 +9,11 @@ import java.nio.charset.Charset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -46,6 +49,13 @@ class CharsetDetectionTest {
                 assertNotNull(charset);
             }
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"xx.@euro", "de_DE.@euro", "en_US.ISO 8859-1", "en_US.ISO-8859-1 "})
+    void codesetThatIsNotALegalCharsetNameIsIgnoredLikeAnUnsupportedOne(String locale) {
+        // null makes the terminal try the next locale variable, then fall back to UTF-8
+        assertNull(UnixTerminal.parseCharsetFromLocale(locale));
     }
 
     /**
