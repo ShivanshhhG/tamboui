@@ -104,8 +104,9 @@ public final class InlineTuiRunner implements AutoCloseable {
                 if (!newSize.equals(previous)) {
                     eventQueue.offer(ResizeEvent.of(newSize.width(), newSize.height()));
                 }
-            } catch (IOException e) {
-                // Ignore resize errors
+            } catch (IOException | RuntimeException e) {
+                // Ignore resize errors, unchecked ones too: a backend may call this handler
+                // on the input thread, which must keep running
             }
         });
 
@@ -216,6 +217,9 @@ public final class InlineTuiRunner implements AutoCloseable {
      * <p>
      * The event handler is called for each event (key, mouse, tick).
      * The renderer is called to update the display when the handler returns true.
+     * <p>
+     * The loop also ends, as if {@link #quit()} was called, when reading terminal
+     * input keeps failing.
      *
      * @param handler  the event handler
      * @param renderer the UI renderer

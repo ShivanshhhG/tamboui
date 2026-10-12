@@ -24,6 +24,10 @@ import dev.tamboui.tui.event.EventParser;
  * are being processed. It reads from the terminal using a blocking call
  * with the configured poll timeout, parses input into events, and queues
  * them for the main loop to consume.
+ * <p>
+ * A read that fails, with an {@link IOException} or an unchecked exception,
+ * is skipped. If reading keeps failing, the reader stops and clears the shared
+ * running flag, so the runner ends instead of going on without input.
  *
  * @see TuiRunner
  */
@@ -102,9 +106,9 @@ public final class TerminalInputReader implements Runnable {
         while (running.get()) {
             try {
                 Event event = EventParser.readEvent(backend, pollTimeoutMs, bindings);
+                consecutiveErrors = 0;
                 if (event != null) {
                     eventQueue.offer(event);
-                    consecutiveErrors = 0;
                 }
             } catch (EOFException e) {
                 running.set(false);
@@ -112,9 +116,11 @@ public final class TerminalInputReader implements Runnable {
             } catch (InterruptedIOException e) {
                 running.set(false);
                 break;
-            } catch (IOException e) {
+            } catch (IOException | RuntimeException e) {
                 consecutiveErrors++;
                 if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    // Without input the application can no longer be used or quit: end it
+                    running.set(false);
                     break;
                 }
             }

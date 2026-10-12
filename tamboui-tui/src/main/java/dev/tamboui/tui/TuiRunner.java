@@ -131,8 +131,9 @@ public final class TuiRunner implements AutoCloseable {
                     lastSize.set(newSize);
                     resizePending.set(true);
                 }
-            } catch (IOException e) {
-                // Ignore resize errors
+            } catch (IOException | RuntimeException e) {
+                // Ignore resize errors, unchecked ones too: a backend may call this handler
+                // on the input thread, which must keep running
             }
         });
 
@@ -230,6 +231,9 @@ public final class TuiRunner implements AutoCloseable {
      * Exceptions thrown during rendering are caught and handled according to
      * the configured {@link RenderErrorHandler}. By default, errors are displayed
      * in the UI and the application waits for user dismissal before quitting.
+     * <p>
+     * The loop also ends, as if {@link #quit()} was called, when reading terminal
+     * input keeps failing.
      *
      * @param handler  the event handler
      * @param renderer the UI renderer
@@ -700,8 +704,9 @@ public final class TuiRunner implements AutoCloseable {
             try {
                 Size newSize = backend.size();
                 eventQueue.offer(ResizeEvent.of(newSize.width(), newSize.height()));
-            } catch (IOException e) {
-                // Ignore resize errors
+            } catch (IOException | RuntimeException e) {
+                // Ignore resize errors, unchecked ones too: an exception thrown from here
+                // would cancel this periodic task, and with it all later ticks
             }
         }
 
