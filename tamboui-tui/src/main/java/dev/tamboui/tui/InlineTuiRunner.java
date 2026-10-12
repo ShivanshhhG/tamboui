@@ -6,7 +6,6 @@ package dev.tamboui.tui;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -81,7 +80,8 @@ public final class InlineTuiRunner implements AutoCloseable {
     private final ScheduledFuture<?> schedulerTask;
     private final AtomicLong frameCount;
     private final Thread shutdownHook;
-    private final AtomicReference<Instant> nextTickTime;
+    private final TickTimer tickTimer;
+    private final AtomicBoolean tickQueued = new AtomicBoolean(false);
     private final AtomicReference<Size> lastSize;
     private final TerminalInputReader inputReader;
 
@@ -93,8 +93,7 @@ public final class InlineTuiRunner implements AutoCloseable {
         this.running = new AtomicBoolean(true);
         this.cleanedUp = new AtomicBoolean(false);
         this.frameCount = new AtomicLong(0);
-        this.nextTickTime = new AtomicReference<>(
-                config.tickRate() != null ? Instant.now().plus(config.tickRate()) : null);
+        this.tickTimer = config.tickRate() != null ? new TickTimer(config.tickRate()) : null;
         this.lastSize = new AtomicReference<>(readCurrentSize(backend));
 
         backend.onResize(() -> {
@@ -275,7 +274,12 @@ public final class InlineTuiRunner implements AutoCloseable {
                 return event;
             }
 
-            return eventQueue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            event = eventQueue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            if (event instanceof TickEvent) {
+                // The scheduler may queue the next tick again
+                tickQueued.set(false);
+            }
+            return event;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
@@ -457,13 +461,10 @@ public final class InlineTuiRunner implements AutoCloseable {
             return;
         }
 
-        if (config.ticksEnabled() && config.tickRate() != null) {
-            Instant now = Instant.now();
-            Instant targetTime = nextTickTime.get();
-
-            if (targetTime != null && !now.isBefore(targetTime)) {
-                nextTickTime.set(targetTime.plus(config.tickRate()));
-
+        if (config.ticksEnabled() && config.tickRate() != null && tickTimer.periodPassed()) {
+            // Only one tick waits in the queue: while it is not handled yet, the periods
+            // that pass add no ticks of their own
+            if (tickQueued.compareAndSet(false, true)) {
                 long frame = frameCount.incrementAndGet();
                 eventQueue.offer(TickEvent.of(frame));
             }

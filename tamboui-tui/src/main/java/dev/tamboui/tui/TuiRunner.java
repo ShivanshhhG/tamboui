@@ -7,7 +7,6 @@ package dev.tamboui.tui;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -88,7 +87,8 @@ public final class TuiRunner implements AutoCloseable {
     private final Thread shutdownHook;
     private final RenderErrorHandler errorHandler;
     private final PrintStream errorOutput;
-    private final AtomicReference<Instant> nextTickTime;
+    private final TickTimer tickTimer;
+    private final AtomicBoolean tickQueued = new AtomicBoolean(false);
     private final AtomicReference<Size> lastSize;
     private final AtomicBoolean resizePending;
     private final AtomicReference<Renderer> activeRenderer;
@@ -109,8 +109,7 @@ public final class TuiRunner implements AutoCloseable {
         this.resizePending = new AtomicBoolean(false);
         this.activeRenderer = new AtomicReference<>();
         this.frameCount = new AtomicLong(0);
-        this.nextTickTime = new AtomicReference<>(
-            config.tickRate() != null ? Instant.now().plus(config.tickRate()) : null);
+        this.tickTimer = config.tickRate() != null ? new TickTimer(config.tickRate()) : null;
         this.errorHandler = config.errorHandler();
         this.errorOutput = config.errorOutput();
 
@@ -480,7 +479,12 @@ public final class TuiRunner implements AutoCloseable {
             }
 
             // No input events, wait for any event
-            return eventQueue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            event = eventQueue.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            if (event instanceof TickEvent) {
+                // The scheduler may queue the next tick again
+                tickQueued.set(false);
+            }
+            return event;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return null;
@@ -711,15 +715,10 @@ public final class TuiRunner implements AutoCloseable {
         }
 
         // Generate tick event if ticks are enabled AND it's time for the next tick
-        if (config.ticksEnabled() && config.tickRate() != null) {
-            Instant now = Instant.now();
-            Instant targetTime = nextTickTime.get();
-
-            if (targetTime != null && !now.isBefore(targetTime)) {
-                // Schedule next tick from the target time to maintain steady rate
-                // This ensures we don't lose ticks due to scheduler jitter
-                nextTickTime.set(targetTime.plus(config.tickRate()));
-
+        if (config.ticksEnabled() && config.tickRate() != null && tickTimer.periodPassed()) {
+            // Only one tick waits in the queue: while it is not handled yet, the periods
+            // that pass add no ticks of their own
+            if (tickQueued.compareAndSet(false, true)) {
                 long frame = frameCount.incrementAndGet();
                 eventQueue.offer(TickEvent.of(frame));
             }
