@@ -243,22 +243,8 @@ public final class EffectTimer {
 
             switch (loopMode) {
                 case LOOP:
-                    // Reset to start and continue
-                    remaining = total;
-                    // Process any overflow time recursively (for very fast processing)
-                    if (overflow.asMillis() > 0 && total.asMillis() > 0) {
-                        return process(overflow);
-                    }
-                    return null;
-
                 case PING_PONG:
-                    // Reverse direction and reset
-                    reverse = !reverse;
-                    remaining = total;
-                    // Process any overflow time recursively
-                    if (overflow.asMillis() > 0 && total.asMillis() > 0) {
-                        return process(overflow);
-                    }
+                    restart(overflow);
                     return null;
 
                 case ONCE:
@@ -266,6 +252,30 @@ public final class EffectTimer {
                     remaining = TFxDuration.ZERO;
                     return overflow;
             }
+        }
+    }
+
+    /**
+     * Restarts a looping timer that has reached its end, and runs the overflow on from the start.
+     * <p>
+     * After a long pause (laptop sleep, a stopped process, a debugger) the overflow can span
+     * thousands of cycles, so the cycles are counted instead of processed one by one.
+     * A {@link LoopMode#PING_PONG} timer reverses its direction once per completed cycle.
+     *
+     * @param overflow the time past the end of the cycle that has just completed
+     */
+    private void restart(TFxDuration overflow) {
+        long totalMs = total.asMillis();
+        long completedCycles = 1;
+        remaining = total;
+        if (totalMs > 0) {
+            long overflowMs = overflow.asMillis();
+            completedCycles += (overflowMs - 1) / totalMs;
+            long intoLastCycle = (overflowMs - 1) % totalMs + 1;
+            remaining = TFxDuration.fromMillis(totalMs - intoLastCycle);
+        }
+        if (loopMode == LoopMode.PING_PONG && completedCycles % 2 == 1) {
+            reverse = !reverse;
         }
     }
 
