@@ -1,7 +1,7 @@
 # TamboUI
 
 [![Release](https://img.shields.io/github/release/tamboui/tamboui.svg)](https://github.com/tamboui/tamboui/releases)
-[![Downloads](https://img.shields.io/github/downloads/tamboui/tamboui/total.svg)](https://hanadigital.github.io/grev/?user=jbangdev&repo=jbang)
+![Maven Central Version](https://img.shields.io/maven-central/v/dev.tamboui/tamboui-core)
 [![Build Status](https://github.com/tamboui/tamboui/workflows/Tests/badge.svg)](https://github.com/tamboui/tamboui/actions)
 [![Chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://tamboui.zulipchat.com)
 [![All Contributors](https://img.shields.io/github/all-contributors/tamboui/tamboui?color=ee8449&style=flat-square)](#contributors)
