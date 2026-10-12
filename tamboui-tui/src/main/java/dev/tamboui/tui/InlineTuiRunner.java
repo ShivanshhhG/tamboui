@@ -139,9 +139,10 @@ public final class InlineTuiRunner implements AutoCloseable {
      *
      * @param height the number of lines for the inline display
      * @return a new InlineTuiRunner
-     * @throws Exception if terminal initialization fails
+     * @throws RuntimeIOException if terminal initialization fails
+     * @throws dev.tamboui.terminal.BackendException if no backend is available
      */
-    public static InlineTuiRunner create(int height) throws Exception {
+    public static InlineTuiRunner create(int height) {
         return create(InlineTuiConfig.defaults(height));
     }
 
@@ -150,13 +151,28 @@ public final class InlineTuiRunner implements AutoCloseable {
      *
      * @param config the configuration to use
      * @return a new InlineTuiRunner
-     * @throws Exception if terminal initialization fails
+     * @throws RuntimeIOException if terminal initialization fails
+     * @throws dev.tamboui.terminal.BackendException if no backend is available
      */
-    public static InlineTuiRunner create(InlineTuiConfig config) throws Exception {
-        return create(BackendFactory.create(), config);
+    public static InlineTuiRunner create(InlineTuiConfig config) {
+        Backend backend;
+        try {
+            backend = BackendFactory.create();
+        } catch (IOException e) {
+            throw new RuntimeIOException("Failed to create backend: " + e.getMessage(), e);
+        }
+        return create(backend, config);
     }
 
-    static InlineTuiRunner create(Backend backend, InlineTuiConfig config) throws Exception {
+    /**
+     * Creates an InlineTuiRunner on the given backend, for embedding or testing.
+     *
+     * @param backend the backend to render to
+     * @param config  the configuration to use
+     * @return a new InlineTuiRunner
+     * @throws RuntimeIOException if initialization fails
+     */
+    public static InlineTuiRunner create(Backend backend, InlineTuiConfig config) {
         InlineDisplay display;
 
         try {
@@ -174,13 +190,26 @@ public final class InlineTuiRunner implements AutoCloseable {
 
             InlineViewport viewport = new InlineViewport(display);
             return new InlineTuiRunner(backend, viewport, config);
-        } catch (Exception e) {
-            try {
-                backend.disableRawMode();
-            } catch (Exception ignored) {
-            }
-            backend.close();
+        } catch (IOException e) {
+            closeQuietly(backend);
+            throw new RuntimeIOException("Failed to create inline runner: " + e.getMessage(), e);
+        } catch (RuntimeException e) {
+            // e.g. BackendException, already an unchecked TamboUIException
+            closeQuietly(backend);
             throw e;
+        }
+    }
+
+    private static void closeQuietly(Backend backend) {
+        try {
+            backend.disableRawMode();
+        } catch (IOException ignored) {
+            // best effort during cleanup
+        }
+        try {
+            backend.close();
+        } catch (IOException ignored) {
+            // best effort during cleanup
         }
     }
 
