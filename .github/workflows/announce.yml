@@ -1,0 +1,51 @@
+name: Announce
+
+# Announce a release once its draft is published. The Release workflow creates the
+# GitHub release as a draft (no announce); publishing that draft fires `released`,
+# which runs JReleaser's announce goal (Zernio) for the published version.
+on:
+  release:
+    types: [released]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to announce (e.g. 0.6.0)'
+        required: true
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            version="${{ github.event.inputs.version }}"
+          else
+            tag="${{ github.event.release.tag_name }}"
+            version="${tag#v}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          # Full history + tags so JReleaser resolves the release context.
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Announce
+        if: env.JRELEASER_ZERNIO_TOKEN
+        uses: jreleaser/release-action@v2
+        with:
+          arguments: announce
+        env:
+          JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
+          JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JRELEASER_ZERNIO_TOKEN: ${{ secrets.ZERNIO_TOKEN }}
+          JRELEASER_ZERNIO_PROFILE_ID: ${{ secrets.ZERNIO_PROFILE_ID }}
+      - name: JReleaser announce output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: jreleaser-announce
+          path: |
+            out/jreleaser/trace.log
+            out/jreleaser/output.properties

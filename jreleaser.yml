@@ -16,6 +16,9 @@ project:
 release:
   github:
     overwrite: true
+    # Create the release as a draft so the auto-changelog can be edited before it goes public.
+    # Announcing is deferred: it runs from announce.yml when the draft is published.
+    draft: true
     changelog:
       formatted: ALWAYS
       preset: conventional-commits
@@ -49,7 +52,6 @@ announce:
     # Announce only on final releases (not snapshots/prereleases).
     active: RELEASE
     # Token resolved from env JRELEASER_ZERNIO_TOKEN (set as a repo secret).
+    # profileId resolved from env JRELEASER_ZERNIO_PROFILE_ID (set as a repo secret).
     # apiHost defaults to https://zernio.com/api/v1.
-    # Profile whose connected accounts receive the post; set via env in CI.
-    profileId: '{{Env.ZERNIO_PROFILE_ID}}'
     message: '🎉 TamboUI {{projectVersion}} is out — modern terminal UIs in Java. Release notes: {{repoUrl}}/releases/tag/{{tagName}}'
