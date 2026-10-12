@@ -40,6 +40,8 @@ graalvmNative {
                 "--no-fallback",
                 "--initialize-at-build-time=org.jline",
                 "--initialize-at-run-time=org.jline.nativ",
+                // JLine's FFM terminal provider (Java 22+) cannot be initialized at image build time
+                "--initialize-at-run-time=org.jline.terminal.impl.ffm",
                 "--allow-incomplete-classpath",
                 "-H:+ReportExceptionStackTraces",
                 "--enable-native-access=ALL-UNNAMED",
