@@ -132,13 +132,10 @@ public class AeshSshHttpDemo implements java.util.function.Consumer<Connection> 
     /**
      * Called by both SSH and HTTP libraries when a new Connection is established.
      * This is shared code - works identically for both protocols.
+     * When the client goes away, the backend ends the app's input, so runTuiApp returns.
      */
     @Override
     public void accept(Connection connection) {
-        connection.setCloseHandler(close -> {
-            // Connection closed
-        });
-
         Thread.startVirtualThread(() -> {
             try {
                 runTuiApp(connection);

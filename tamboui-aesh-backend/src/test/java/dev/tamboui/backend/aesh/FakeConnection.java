@@ -15,10 +15,19 @@ import org.aesh.terminal.tty.Capability;
 import org.aesh.terminal.tty.Signal;
 import org.aesh.terminal.tty.Size;
 
-/** A {@link Connection} for backend tests: records the output and lets a test type input. */
+/**
+ * A {@link Connection} for backend tests: records the output and lets a test type input.
+ * <p>
+ * {@link #close()} acts as the client going away: it calls the close handler, and a write
+ * after it fails, as on aesh's WebSocket connection.
+ */
 final class FakeConnection implements Connection {
     private final StringBuilder output = new StringBuilder();
+    private volatile boolean closed;
     private final Consumer<int[]> stdout = codePoints -> {
+        if (closed) {
+            throw new IllegalStateException("write to a closed connection");
+        }
         for (int codePoint : codePoints) {
             output.appendCodePoint(codePoint);
         }
@@ -99,6 +108,10 @@ final class FakeConnection implements Connection {
 
     @Override
     public void close() {
+        closed = true;
+        if (closeHandler != null) {
+            closeHandler.accept(null);
+        }
     }
 
     @Override

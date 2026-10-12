@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.aesh.terminal.Attributes;
 import org.aesh.terminal.Connection;
@@ -37,10 +38,15 @@ import dev.tamboui.terminal.Mode2027Support;
  *       (e.g., from SSH or HTTP); the caller retains ownership and {@link #close()}
  *       will <em>not</em> close the connection.</li>
  * </ul>
+ * <p>
+ * When the connection closes, for example when the SSH client or the browser tab goes
+ * away, {@link #read(int)} returns {@code -1} (end of input), so a {@code TuiRunner}
+ * stops as it does when a terminal's input ends, and output is dropped from then on.
  */
 public class AeshBackend extends AbstractBackend {
 
     private static final String CSI = "\033[";
+    private static final int EOF = -1;
 
     private final Connection connection;
     private final boolean ownConnection;
@@ -51,6 +57,7 @@ public class AeshBackend extends AbstractBackend {
     private boolean mouseEnabled;
     private boolean mode2027Enabled;
     private Runnable resizeHandler;
+    private volatile boolean connectionClosed;
 
     /**
      * Creates a new Aesh backend using a default TerminalConnection.
@@ -69,6 +76,10 @@ public class AeshBackend extends AbstractBackend {
      * This constructor allows creating backends from SSH or HTTP connections.
      * The caller retains ownership of the connection; it will not be closed
      * when this backend is closed.
+     * <p>
+     * The backend sets the connection's close handler, to end the input when the
+     * connection closes, and still calls a close handler set before. To add one
+     * later, wrap the handler that {@code connection.closeHandler()} returns.
      *
      * @param connection the connection to use for terminal I/O
      * @throws IOException if the terminal cannot be initialized
@@ -100,12 +111,27 @@ public class AeshBackend extends AbstractBackend {
             }
         });
 
+        // End the input when the connection closes, so the app stops on EOF instead of
+        // writing to a closed connection
+        Consumer<Void> previousCloseHandler = connection.closeHandler();
+        connection.setCloseHandler(ignored -> {
+            connectionClosed = true;
+            inputQueue.offer(EOF);
+            if (previousCloseHandler != null) {
+                previousCloseHandler.accept(ignored);
+            }
+        });
+
         // Start reader AFTER handlers are set up to avoid losing input (#409)
         this.connection.openNonBlocking();
     }
 
     @Override
     public void flush() throws IOException {
+        if (connectionClosed) {
+            outputBuffer.setLength(0);
+            return;
+        }
         if (outputBuffer.length() > 0) {
             connection.write(outputBuffer.toString());
             outputBuffer.setLength(0);
@@ -363,7 +389,14 @@ public class AeshBackend extends AbstractBackend {
                 // Timeout read
                 ch = inputQueue.poll(timeoutMs, TimeUnit.MILLISECONDS);
             }
-            return ch == null ? -2 : ch;  // -2: timeout
+            if (ch == null) {
+                return -2;  // timeout
+            }
+            if (ch == EOF) {
+                // Keep the end of input for the reads that follow
+                inputQueue.offer(EOF);
+            }
+            return ch;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return -2;
