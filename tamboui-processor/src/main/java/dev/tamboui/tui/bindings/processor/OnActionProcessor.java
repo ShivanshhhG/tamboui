@@ -20,7 +20,6 @@ import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -48,7 +47,6 @@ import dev.tamboui.annotations.bindings.OnAction;
  * META-INF/services entries for automatic discovery via ServiceLoader.
  */
 @SupportedAnnotationTypes("dev.tamboui.annotations.bindings.OnAction")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class OnActionProcessor extends AbstractProcessor {
 
     /**
@@ -76,6 +74,21 @@ public class OnActionProcessor extends AbstractProcessor {
         if (eventElement != null) {
             this.eventType = eventElement.asType();
         }
+    }
+
+    /**
+     * Returns the latest source version that the running compiler supports.
+     * <p>
+     * The processor only looks at the annotated methods and the classes that
+     * declare them, which every source version models alike. Declaring an older
+     * version makes javac warn on every compilation at a newer source level, such
+     * as {@code --release 21}, and that warning fails a {@code -Werror} build.
+     *
+     * @return {@link SourceVersion#latestSupported()}
+     */
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        return SourceVersion.latestSupported();
     }
 
     @Override

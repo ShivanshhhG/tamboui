@@ -18,9 +18,3 @@ dependencies {
 application {
     mainClass.set("dev.tamboui.demo.actionhandler.ActionHandlerDemo")
 }
-
-tasks.withType<JavaCompile>().configureEach {
-    // Remove -Werror for demo project - Gradle's internal TimeTrackingProcessor
-    // causes unavoidable warning when using annotation processors with Java 21
-    options.compilerArgs.remove("-Werror")
-}

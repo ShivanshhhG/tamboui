@@ -15,6 +15,8 @@ import javax.tools.StandardLocation;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.google.testing.compile.Compilation;
 import com.google.testing.compile.JavaFileObjects;
@@ -91,6 +93,47 @@ class OnActionProcessorTest {
                 .generatedSourceFile("test.MyHandler_ActionHandlerRegistrar")
                 .contentsAsUtf8String()
                 .contains("implements ActionHandlerRegistrar<MyHandler>");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"11", "17", "21"})
+    void compilesWithoutWarningsAtNewerReleases(String release) {
+        Compilation compilation = javac()
+                .withProcessors(new OnActionProcessor())
+                .withOptions("--release", release, "-Xlint:all", "-Werror")
+                .compile(saveHandlerSource());
+
+        assertThat(compilation).succeededWithoutWarnings();
+        assertThat(compilation)
+                .generatedSourceFile("test.MyHandler_ActionHandlerRegistrar")
+                .contentsAsUtf8String()
+                .contains("handler.on(\"save\", target::save)");
+    }
+
+    @Test
+    void compilesWithoutWarningsAtTheCompilersLatestSourceVersion() {
+        // without --release, javac compiles at the latest source version it supports
+        Compilation compilation = javac()
+                .withProcessors(new OnActionProcessor())
+                .withOptions("-Xlint:all", "-Werror")
+                .compile(saveHandlerSource());
+
+        assertThat(compilation).succeededWithoutWarnings();
+    }
+
+    private static JavaFileObject saveHandlerSource() {
+        return JavaFileObjects.forSourceString(
+                "test.MyHandler",
+                "package test;\n" +
+                "\n" +
+                "import dev.tamboui.annotations.bindings.OnAction;\n" +
+                "import dev.tamboui.tui.event.Event;\n" +
+                "\n" +
+                "public class MyHandler {\n" +
+                "    @OnAction(\"save\")\n" +
+                "    void save(Event event) {}\n" +
+                "}\n"
+        );
     }
 
     @Test
