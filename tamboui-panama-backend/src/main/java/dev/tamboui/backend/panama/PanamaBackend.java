@@ -301,6 +301,8 @@ public class PanamaBackend extends AbstractBackend {
             }
 
             showCursor();
+            // Turns Mode 2027 off too: TuiRunner closes the backend without disabling raw mode first
+            disableRawMode();
             flush();
         } finally {
             terminal.close();
