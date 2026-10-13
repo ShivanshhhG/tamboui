@@ -419,5 +419,16 @@ Add a JavaDoc section to each Element class documenting its CSS child selectors:
 - Review your own code changes before finishing work
 - Keep one root cause per PR, keep it minimal, and scope the title to what changed ("Paragraph", not "wrapping")
 - Show the bug: a before/after image or sketch, and a reproducer the reviewer can run
+- Prefer a **self-contained JBang reproducer**: a single `.java` file (e.g. a gist) with the dependencies and runtime declared *in the file*, so a reviewer runs it with just `jbang <url>` and no flags to remember. Put the directives in the source rather than on the command line:
+
+```java
+///usr/bin/env jbang "$0" "$@" ; exit $?
+//JAVA 21
+//DEPS dev.tamboui:tamboui-toolkit:LATEST
+//DEPS dev.tamboui:tamboui-aesh-backend:LATEST
+//RUNTIME_OPTIONS --enable-native-access=ALL-UNNAMED  // only when using the Panama (FFM) backend
+```
+
+  So `jbang https://gist.github.com/.../Repro.java` just works, instead of `jbang --deps ... --java 21 <url>`. Use `LATEST` for released behaviour, or a `-SNAPSHOT` / local build when reproducing an unreleased fix.
 - Say what the PR leaves out on purpose
 - Send PRs one at a time, most important first, and wait for review before sending more
