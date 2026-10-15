@@ -11,6 +11,7 @@ import dev.tamboui.buffer.Cell;
 import dev.tamboui.layout.Rect;
 import dev.tamboui.style.Color;
 import dev.tamboui.style.ColorConverter;
+import dev.tamboui.style.ContinuationIndent;
 import dev.tamboui.style.Overflow;
 import dev.tamboui.style.PropertyDefinition;
 import dev.tamboui.style.PropertyRegistry;
@@ -21,6 +22,7 @@ import dev.tamboui.terminal.Frame;
 import dev.tamboui.text.CharWidth;
 import dev.tamboui.text.Line;
 import dev.tamboui.text.Span;
+import dev.tamboui.text.TextWrapOptions;
 import dev.tamboui.widget.StatefulWidget;
 import dev.tamboui.widgets.block.Block;
 import dev.tamboui.widgets.syntax.RegexSyntaxHighlighter;
@@ -68,6 +70,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
     private final boolean showLineNumbers;
     private final Style lineNumberStyle;
     private final Overflow overflow;
+    private final ContinuationIndent continuationIndent;
     private final SyntaxHighlighter highlighter;
     private final String highlightLanguage;
     private final SyntaxTheme highlightTheme;
@@ -77,6 +80,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
         this.placeholder = builder.placeholder;
         this.showLineNumbers = builder.showLineNumbers;
         this.overflow = builder.resolveOverflow();
+        this.continuationIndent = builder.continuationIndent;
 
         // Resolve style-aware properties
         Color resolvedBg = builder.resolveBackground();
@@ -125,6 +129,19 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
         return new Builder();
     }
 
+    /**
+     * Returns the continuation indent strategy used when wrapping lines.
+     *
+     * @return the continuation indent strategy
+     */
+    public ContinuationIndent continuationIndent() {
+        return continuationIndent;
+    }
+
+    private TextWrapOptions wrapOptions() {
+        return TextWrapOptions.of(overflow, continuationIndent);
+    }
+
     @Override
     public void render(Rect area, Buffer buffer, TextAreaState state) {
         if (area.isEmpty()) {
@@ -164,7 +181,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
         }
 
         // Ensure cursor is visible
-        state.ensureCursorVisible(visibleHeight, visibleWidth, overflow);
+        state.ensureCursorVisible(visibleHeight, visibleWidth, wrapOptions());
 
         if (TextAreaState.isWrapping(overflow)) {
             renderWrapped(inputArea, textArea, gutterWidth, buffer, state, visibleHeight, visibleWidth);
@@ -255,7 +272,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
 
     private void renderWrapped(Rect inputArea, Rect textArea, int gutterWidth, Buffer buffer, TextAreaState state,
                                 int visibleHeight, int visibleWidth) {
-        List<TextAreaState.DisplayRow> rows = state.computeDisplayRows(visibleWidth, overflow);
+        List<TextAreaState.DisplayRow> rows = state.computeDisplayRows(visibleWidth, wrapOptions());
         int scrollRow = state.scrollRow();
 
         for (int y = 0; y < visibleHeight; y++) {
@@ -368,7 +385,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
         int relativeRow;
         int relativeCol;
         if (TextAreaState.isWrapping(overflow)) {
-            List<TextAreaState.DisplayRow> rows = state.computeDisplayRows(textArea.width(), overflow);
+            List<TextAreaState.DisplayRow> rows = state.computeDisplayRows(textArea.width(), wrapOptions());
             int cursorDisplayIndex = state.findCursorDisplayRowIndex(rows, textArea.width());
             TextAreaState.DisplayRow row = rows.get(cursorDisplayIndex);
 
@@ -423,7 +440,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
         Rect area = new Rect(0, 0, width, Short.MAX_VALUE);
         Rect inputArea = block != null ? block.inner(area) : area;
         int textWidth = textAreaRect(inputArea, gutterWidth(state)).width();
-        int rows = state.computeDisplayRows(textWidth, overflow).size();
+        int rows = state.computeDisplayRows(textWidth, wrapOptions()).size();
         return rows + area.height() - inputArea.height();
     }
 
@@ -439,6 +456,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
         private boolean showLineNumbers = false;
         private Style lineNumberStyle = Style.EMPTY.dim();
         private Overflow overflow;
+        private ContinuationIndent continuationIndent = ContinuationIndent.HANGING;
         private SyntaxHighlighter highlighter;
         private String highlightLanguage;
         private SyntaxTheme highlightTheme = SyntaxTheme.DEFAULTS;
@@ -544,6 +562,17 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
          */
         public Builder overflow(Overflow overflow) {
             this.overflow = overflow;
+            return this;
+        }
+
+        /**
+         * Sets the continuation indent strategy used when wrapping lines, mirroring {@code Paragraph.Builder.continuationIndent}.
+         *
+         * @param continuationIndent the continuation indent strategy, or null for default ({@link ContinuationIndent#HANGING})
+         * @return this builder
+         */
+        public Builder continuationIndent(ContinuationIndent continuationIndent) {
+            this.continuationIndent = continuationIndent != null ? continuationIndent : ContinuationIndent.HANGING;
             return this;
         }
 

@@ -43,6 +43,31 @@ public final class MarkdownInlineRenderer {
 
     /**
      * Renders the inline children of {@code parent} into lines using the
+     * given text wrap options.
+     *
+     * @param parent the block node whose inline children should be rendered
+     * @param baseStyle the style applied to plain text (e.g. heading style)
+     * @param maxWidth target width in columns; values &lt;= 0 produce an empty list
+     * @param styles the style palette
+     * @param options the text wrap options
+     * @return a list of lines that all fit within {@code maxWidth}
+     */
+    public static List<Line> render(
+        Node parent, Style baseStyle, int maxWidth, MarkdownStyles styles, TextWrapOptions options) {
+        if (maxWidth <= 0) {
+            return new ArrayList<>();
+        }
+        SpanCollector collector = new SpanCollector(baseStyle, styles);
+        Node child = parent.getFirstChild();
+        while (child != null) {
+            child.accept(collector);
+            child = child.getNext();
+        }
+        return applyOverflow(collector.lineGroups, maxWidth, options);
+    }
+
+    /**
+     * Renders the inline children of {@code parent} into lines using the
      * given overflow strategy.
      *
      * @param parent the block node whose inline children should be rendered
@@ -54,16 +79,7 @@ public final class MarkdownInlineRenderer {
      */
     public static List<Line> render(
         Node parent, Style baseStyle, int maxWidth, MarkdownStyles styles, Overflow overflow) {
-        if (maxWidth <= 0) {
-            return new ArrayList<>();
-        }
-        SpanCollector collector = new SpanCollector(baseStyle, styles);
-        Node child = parent.getFirstChild();
-        while (child != null) {
-            child.accept(collector);
-            child = child.getNext();
-        }
-        return applyOverflow(collector.lineGroups, maxWidth, overflow);
+        return render(parent, baseStyle, maxWidth, styles, TextWrapOptions.of(overflow));
     }
 
     /**
@@ -91,12 +107,12 @@ public final class MarkdownInlineRenderer {
     }
 
     private static List<Line> applyOverflow(
-        List<List<Span>> sourceLines, int maxWidth, Overflow overflow) {
+        List<List<Span>> sourceLines, int maxWidth, TextWrapOptions options) {
         List<Line> lines = new ArrayList<>(sourceLines.size());
         for (List<Span> spans : sourceLines) {
             lines.add(Line.from(spans));
         }
-        List<Line> result = TextWrapper.wrap(lines, maxWidth, TextWrapOptions.of(overflow));
+        List<Line> result = TextWrapper.wrap(lines, maxWidth, options);
         if (result.isEmpty()) {
             result = new ArrayList<>();
             result.add(Line.empty());

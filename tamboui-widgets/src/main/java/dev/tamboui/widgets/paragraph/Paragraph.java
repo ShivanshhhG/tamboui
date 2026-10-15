@@ -108,6 +108,15 @@ public final class Paragraph implements Widget {
         return builder().text(Text.from(span)).build();
     }
 
+    /**
+     * Returns the continuation indent strategy used when wrapping lines.
+     *
+     * @return the continuation indent strategy
+     */
+    public ContinuationIndent continuationIndent() {
+        return continuationIndent;
+    }
+
     @Override
     public void render(Rect area, Buffer buffer) {
         if (area.isEmpty()) {
@@ -313,7 +322,13 @@ public final class Paragraph implements Widget {
             return this;
         }
 
-        Builder continuationIndent(ContinuationIndent continuationIndent) {
+        /**
+         * Sets the continuation indent strategy used when wrapping lines.
+         *
+         * @param continuationIndent the continuation indent strategy, or null for default ({@link ContinuationIndent#HANGING})
+         * @return this builder
+         */
+        public Builder continuationIndent(ContinuationIndent continuationIndent) {
             this.continuationIndent = continuationIndent != null ? continuationIndent : ContinuationIndent.HANGING;
             return this;
         }

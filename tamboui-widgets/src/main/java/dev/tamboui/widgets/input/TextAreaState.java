@@ -256,6 +256,31 @@ public final class TextAreaState {
     /**
      * Moves the cursor up one row.
      * <p>
+     * With wrapping enabled, moves to the previous visual (wrapped) row,
+     * which may be a wrapped segment of the same logical line or the last segment of the
+     * previous logical line.
+     *
+     * @param visibleCols the number of visible columns (used to compute wrapped rows)
+     * @param options     the wrap options
+     */
+    public void moveCursorUp(int visibleCols, TextWrapOptions options) {
+        TextWrapOptions opt = options != null ? options : TextWrapOptions.defaults();
+        if (!isWrapping(opt.overflow())) {
+            moveCursorUpClip();
+            return;
+        }
+
+        List<DisplayRow> rows = computeDisplayRows(visibleCols, opt);
+        int index = findCursorDisplayRowIndex(rows, visibleCols);
+        if (index <= 0) {
+            return;
+        }
+        moveCursorToDisplayRow(rows, index, index - 1, visibleCols);
+    }
+
+    /**
+     * Moves the cursor up one row.
+     * <p>
      * With {@code WRAP_WORD}/{@code WRAP_CHARACTER}, moves to the previous visual (wrapped)
      * row, which may be a wrapped segment of the same logical line or the last segment of the
      * previous logical line. Every other {@link Overflow} value (including {@code null}) is
@@ -266,17 +291,7 @@ public final class TextAreaState {
      * @param overflow    the overflow mode
      */
     public void moveCursorUp(int visibleCols, Overflow overflow) {
-        if (!isWrapping(overflow)) {
-            moveCursorUpClip();
-            return;
-        }
-
-        List<DisplayRow> rows = computeDisplayRows(visibleCols, overflow);
-        int index = findCursorDisplayRowIndex(rows, visibleCols);
-        if (index <= 0) {
-            return;
-        }
-        moveCursorToDisplayRow(rows, index, index - 1, visibleCols);
+        moveCursorUp(visibleCols, TextWrapOptions.of(overflow));
     }
 
     private void moveCursorUpClip() {
@@ -296,6 +311,31 @@ public final class TextAreaState {
     /**
      * Moves the cursor down one row.
      * <p>
+     * With wrapping enabled, moves to the next visual (wrapped) row,
+     * which may be a wrapped segment of the same logical line or the first segment of the next
+     * logical line.
+     *
+     * @param visibleCols the number of visible columns (used to compute wrapped rows)
+     * @param options     the wrap options
+     */
+    public void moveCursorDown(int visibleCols, TextWrapOptions options) {
+        TextWrapOptions opt = options != null ? options : TextWrapOptions.defaults();
+        if (!isWrapping(opt.overflow())) {
+            moveCursorDownClip();
+            return;
+        }
+
+        List<DisplayRow> rows = computeDisplayRows(visibleCols, opt);
+        int index = findCursorDisplayRowIndex(rows, visibleCols);
+        if (index < 0 || index >= rows.size() - 1) {
+            return;
+        }
+        moveCursorToDisplayRow(rows, index, index + 1, visibleCols);
+    }
+
+    /**
+     * Moves the cursor down one row.
+     * <p>
      * With {@code WRAP_WORD}/{@code WRAP_CHARACTER}, moves to the next visual (wrapped) row,
      * which may be a wrapped segment of the same logical line or the first segment of the next
      * logical line. Every other {@link Overflow} value (including {@code null}) is treated as
@@ -306,17 +346,7 @@ public final class TextAreaState {
      * @param overflow    the overflow mode
      */
     public void moveCursorDown(int visibleCols, Overflow overflow) {
-        if (!isWrapping(overflow)) {
-            moveCursorDownClip();
-            return;
-        }
-
-        List<DisplayRow> rows = computeDisplayRows(visibleCols, overflow);
-        int index = findCursorDisplayRowIndex(rows, visibleCols);
-        if (index < 0 || index >= rows.size() - 1) {
-            return;
-        }
-        moveCursorToDisplayRow(rows, index, index + 1, visibleCols);
+        moveCursorDown(visibleCols, TextWrapOptions.of(overflow));
     }
 
     private void moveCursorDownClip() {
@@ -582,6 +612,35 @@ public final class TextAreaState {
     /**
      * Adjusts scroll offsets to keep the cursor visible.
      * <p>
+     * With wrapping enabled, {@code scrollRow} is treated as an index into the wrapped display rows
+     * (see {@link #computeDisplayRows}) and {@code scrollCol} is always {@code 0}, since a wrapped row
+     * always fits within {@code visibleCols}.
+     *
+     * @param visibleRows the number of visible rows
+     * @param visibleCols the number of visible columns
+     * @param options     the wrap options
+     */
+    public void ensureCursorVisible(int visibleRows, int visibleCols, TextWrapOptions options) {
+        TextWrapOptions opt = options != null ? options : TextWrapOptions.defaults();
+        if (!isWrapping(opt.overflow())) {
+            ensureCursorVisibleClip(visibleRows, visibleCols);
+            return;
+        }
+
+        List<DisplayRow> rows = computeDisplayRows(visibleCols, opt);
+        int cursorDisplayIndex = findCursorDisplayRowIndex(rows, visibleCols);
+
+        if (cursorDisplayIndex < scrollRow) {
+            scrollRow = cursorDisplayIndex;
+        } else if (cursorDisplayIndex >= scrollRow + visibleRows) {
+            scrollRow = cursorDisplayIndex - visibleRows + 1;
+        }
+        scrollCol = 0;
+    }
+
+    /**
+     * Adjusts scroll offsets to keep the cursor visible.
+     * <p>
      * With {@code WRAP_WORD}/{@code WRAP_CHARACTER}, {@code scrollRow} is treated as an index
      * into the wrapped display rows (see {@link #computeDisplayRows}) and {@code scrollCol} is
      * always {@code 0}, since a wrapped row always fits within {@code visibleCols}. Every other
@@ -593,20 +652,7 @@ public final class TextAreaState {
      * @param overflow    the overflow mode
      */
     public void ensureCursorVisible(int visibleRows, int visibleCols, Overflow overflow) {
-        if (!isWrapping(overflow)) {
-            ensureCursorVisibleClip(visibleRows, visibleCols);
-            return;
-        }
-
-        List<DisplayRow> rows = computeDisplayRows(visibleCols, overflow);
-        int cursorDisplayIndex = findCursorDisplayRowIndex(rows, visibleCols);
-
-        if (cursorDisplayIndex < scrollRow) {
-            scrollRow = cursorDisplayIndex;
-        } else if (cursorDisplayIndex >= scrollRow + visibleRows) {
-            scrollRow = cursorDisplayIndex - visibleRows + 1;
-        }
-        scrollCol = 0;
+        ensureCursorVisible(visibleRows, visibleCols, TextWrapOptions.of(overflow));
     }
 
     private void ensureCursorVisibleClip(int visibleRows, int visibleCols) {
