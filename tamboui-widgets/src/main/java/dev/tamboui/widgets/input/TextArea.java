@@ -271,10 +271,17 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
                 int lineNumber = row.startCol() == 0 ? row.logicalRow() + 1 : -1;
                 renderGutterCell(inputArea, gutterWidth, screenY, lineNumber, buffer);
 
-                buffer.setString(textArea.left(), screenY, visibleText, style);
+                int indent = row.indent();
+                if (indent > 0) {
+                    for (int x = textArea.left(); x < textArea.left() + indent && x < textArea.right(); x++) {
+                        buffer.set(x, screenY, new Cell(" ", style));
+                    }
+                }
+                int textStart = textArea.left() + indent;
+                buffer.setString(textStart, screenY, visibleText, style);
 
                 int visibleTextWidth = CharWidth.of(visibleText);
-                int textEnd = textArea.left() + visibleTextWidth;
+                int textEnd = textStart + visibleTextWidth;
                 for (int x = textEnd; x < textArea.right(); x++) {
                     buffer.set(x, screenY, new Cell(" ", style));
                 }
@@ -369,7 +376,7 @@ public final class TextArea implements StatefulWidget<TextAreaState> {
             String cursorLine = state.getLine(row.logicalRow());
             // A cursor snapped forward past a word-wrap break sits before this row's start.
             int cursorCol = Math.max(row.startCol(), state.cursorCol());
-            relativeCol = CharWidth.of(cursorLine.substring(row.startCol(), cursorCol));
+            relativeCol = row.indent() + CharWidth.of(cursorLine.substring(row.startCol(), cursorCol));
         } else {
             int cursorRow = state.cursorRow();
             int cursorCol = state.cursorCol();

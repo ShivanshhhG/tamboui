@@ -268,6 +268,23 @@ class ParagraphTest {
     }
 
     @Test
+    @DisplayName("FLUSH_LEFT restarts wrapped rows at column 0")
+    void flushLeftRestartsAtEdge() {
+        Paragraph paragraph = Paragraph.builder()
+            .text(Text.from("    abcdefghijkl"))
+            .overflow(Overflow.WRAP_CHARACTER)
+            .continuationIndent(dev.tamboui.style.ContinuationIndent.FLUSH_LEFT)
+            .build();
+        Rect area = new Rect(0, 0, 10, 3);
+        Buffer buffer = Buffer.empty(area);
+
+        paragraph.render(area, buffer);
+
+        assertThat(row(buffer, 0)).isEqualTo("    abcdef");
+        assertThat(row(buffer, 1)).isEqualTo("ghijkl");
+    }
+
+    @Test
     @DisplayName("a deep indent is kept as long as it leaves room for text")
     void hangingIndentKeepsADeepIndent() {
         Paragraph paragraph = Paragraph.builder()
